@@ -1,0 +1,13 @@
+Otoscope is a clean, ad-free replacement for the proprietary apps shipped with cheap Wi-Fi otoscope cameras (Xylla / Wudaopu hardware, and similar JesHome / Enjoy-branded devices).
+
+The stock companion app — "AIR-Look" — bundles a dozen ad and analytics SDKs (AdMob, AppLovin, IronSource, MBridge, Vungle, Pangle, Mintegral, etc.). Otoscope reimplements just the connection and viewer functionality, with nothing else.
+
+Features:
+
+* Discover the camera over Bluetooth Low Energy.
+* Join the camera's open Wi-Fi access point in a one-process scope, so the rest of your traffic is not affected.
+* Live video stream, decoded in-app over the camera's custom UDP protocol.
+* Auto-rotation driven by the camera's on-board accelerometer.
+* Circular mask matching the otoscope lens.
+
+Otoscope is GPL-3.0-or-later and contains no third-party trackers, ad SDKs, or proprietary native libraries.

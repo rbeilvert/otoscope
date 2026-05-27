@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- The camera serves a cleartext RTSP stream on the LAN it hosts.
+         We don't talk to anything else over the network, so it's fine to
+         globally permit cleartext. (NetworkSecurityConfig doesn't support
+         CIDR ranges, hence the blanket policy.) -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
