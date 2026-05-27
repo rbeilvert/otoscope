@@ -1,0 +1,1 @@
+Initial release. BLE discovery, Wi-Fi join, live MJPEG stream, accelerometer-driven auto-rotation, circular lens mask.

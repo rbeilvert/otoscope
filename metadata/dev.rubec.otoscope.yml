@@ -1,0 +1,32 @@
+# F-Droid build metadata. This file is meant to be copied into the
+# fdroiddata repository at https://gitlab.com/fdroid/fdroiddata under
+# metadata/dev.rubec.otoscope.yml when submitting the app.
+#
+# Reference: https://f-droid.org/docs/Build_Metadata_Reference/
+
+Categories:
+  - Multimedia
+  - Connectivity
+License: GPL-3.0-or-later
+AuthorName: rubec
+# Replace these once the project is hosted publicly.
+SourceCode: https://codeberg.org/rubec/otoscope
+IssueTracker: https://codeberg.org/rubec/otoscope/issues
+Changelog: https://codeberg.org/rubec/otoscope/src/branch/main/CHANGELOG.md
+
+AutoName: Otoscope
+
+RepoType: git
+Repo: https://codeberg.org/rubec/otoscope.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1
+    commit: v0.1.0
+    gradle:
+      - yes
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1
