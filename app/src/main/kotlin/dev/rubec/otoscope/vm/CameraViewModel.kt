@@ -38,6 +38,7 @@ sealed interface CameraState {
         val rotation: StateFlow<Float>,
         val model: StateFlow<String?>,
         val battery: StateFlow<OtoscopeControlClient.Battery?>,
+        val flipEnabled: MutableStateFlow<Boolean>,
     ) : CameraState
     data class Error(val message: String) : CameraState
 }
@@ -119,6 +120,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null as Bitmap?)
         val modelState = MutableStateFlow<String?>(null)
         val batteryState = MutableStateFlow<OtoscopeControlClient.Battery?>(null)
+        val flipEnabled = MutableStateFlow(true)
 
         camera.start()
 
@@ -147,6 +149,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             rotation = camera.rotation,
             model = modelState.asStateFlow(),
             battery = batteryState.asStateFlow(),
+            flipEnabled = flipEnabled,
         )
     }
 

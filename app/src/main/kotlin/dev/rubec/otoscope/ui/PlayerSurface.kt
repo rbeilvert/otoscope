@@ -21,18 +21,19 @@ import androidx.compose.ui.layout.ContentScale
  * Renders the latest camera frame inside a circular mask.
  *
  * Two transformations live here:
- *  - **Horizontal mirror**. The lens optics deliver a left/right-flipped image —
- *    something pointed to the user's right shows up on the left of the frame
- *    without this. We undo it with `scaleX = -1f`.
+ *  - **Horizontal mirror**. When [flipEnabled] is true, the image is flipped
+ *    horizontally with `scaleX = -1f`. This corrects for lens optics that
+ *    deliver a left/right-flipped image.
  *  - **Rotation**. The camera's on-board accelerometer feeds [rotationDegrees].
- *    We negate it because the horizontal flip reverses the visual sense of
- *    rotation — without the negation a clockwise hand motion looks
- *    counter-clockwise on screen.
+ *    When [flipEnabled] is true, we negate the rotation because the horizontal
+ *    flip reverses the visual sense of rotation — without the negation a
+ *    clockwise hand motion would look counter-clockwise on screen.
  */
 @Composable
 fun CameraFrame(
     frame: Bitmap?,
     rotationDegrees: Float = 0f,
+    flipEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -49,8 +50,8 @@ fun CameraFrame(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        scaleX = -1f
-                        rotationZ = -rotationDegrees
+                        scaleX = if (flipEnabled) -1f else 1f
+                        rotationZ = if (flipEnabled) -rotationDegrees else rotationDegrees
                     },
                 contentScale = ContentScale.Crop,
             )

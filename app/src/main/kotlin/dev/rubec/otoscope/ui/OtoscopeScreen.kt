@@ -233,6 +233,7 @@ private fun StreamingView(state: CameraState.Streaming, onDisconnect: () -> Unit
     val rotation by state.rotation.collectAsStateWithLifecycle()
     val model by state.model.collectAsStateWithLifecycle()
     val battery by state.battery.collectAsStateWithLifecycle()
+    val flipEnabled by state.flipEnabled.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -241,12 +242,27 @@ private fun StreamingView(state: CameraState.Streaming, onDisconnect: () -> Unit
         CameraFrame(
             frame = frame,
             rotationDegrees = rotation,
+            flipEnabled = flipEnabled,
             modifier = Modifier.fillMaxWidth()
         )
 
         CameraStatus(modelName = model, ssid = state.advert.ssid, battery = battery)
 
-        OutlinedButton(onClick = onDisconnect) { Text("Disconnect") }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            OutlinedButton(
+                onClick = { state.flipEnabled.value = !state.flipEnabled.value },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(if (flipEnabled) "Flip: ON" else "Flip: OFF")
+            }
+            OutlinedButton(
+                onClick = onDisconnect,
+                modifier = Modifier.weight(1f)
+            ) { Text("Disconnect") }
+        }
     }
 }
 
