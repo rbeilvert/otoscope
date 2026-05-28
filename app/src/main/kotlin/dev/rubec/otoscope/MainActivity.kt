@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -46,6 +47,12 @@ class MainActivity : ComponentActivity() {
                 if (result.resultCode == RESULT_OK) vm.startScan()
             }
 
+            // The Wi-Fi settings panel doesn't report a result code, so just
+            // re-scan when the user returns — startScan() re-checks Wi-Fi state.
+            val enableWifiLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult()
+            ) { vm.startScan() }
+
             OtoscopeTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -59,10 +66,14 @@ class MainActivity : ComponentActivity() {
                         onEnableBluetooth = {
                             enableBtLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
                         },
+                        onEnableWifi = {
+                            enableWifiLauncher.launch(Intent(Settings.Panel.ACTION_WIFI))
+                        },
                         onStartScan = vm::startScan,
                         onStopScan = vm::stopScan,
                         onConnect = vm::connect,
                         onDisconnect = vm::disconnect,
+                        onSetFlip = vm::setFlipEnabled,
                     )
                 }
             }
