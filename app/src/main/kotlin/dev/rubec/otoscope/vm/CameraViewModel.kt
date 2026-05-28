@@ -38,6 +38,7 @@ sealed interface CameraState {
         val rotation: StateFlow<Float>,
         val model: StateFlow<String?>,
         val battery: StateFlow<OtoscopeControlClient.Battery?>,
+        val flipEnabled: StateFlow<Boolean>,
     ) : CameraState
     data class Error(val message: String) : CameraState
 }
@@ -56,6 +57,10 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     private var scanJob: Job? = null
     private var sessionJobs: MutableList<Job> = mutableListOf()
+
+    /** Horizontal-mirror state for the active stream. Owned here so the UI
+     *  reads it read-only and routes toggles back through [setFlipEnabled]. */
+    private val flipEnabled = MutableStateFlow(true)
 
     fun startScan() {
         if (!scanner.isBluetoothEnabled) {
@@ -119,6 +124,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null as Bitmap?)
         val modelState = MutableStateFlow<String?>(null)
         val batteryState = MutableStateFlow<OtoscopeControlClient.Battery?>(null)
+        flipEnabled.value = true
 
         camera.start()
 
@@ -147,7 +153,12 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             rotation = camera.rotation,
             model = modelState.asStateFlow(),
             battery = batteryState.asStateFlow(),
+            flipEnabled = flipEnabled.asStateFlow(),
         )
+    }
+
+    fun setFlipEnabled(enabled: Boolean) {
+        flipEnabled.value = enabled
     }
 
     fun disconnect() {

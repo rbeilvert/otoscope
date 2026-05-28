@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -59,15 +60,28 @@ fun OtoscopeScreen(
     permissionsGranted: Boolean,
     onRequestPermissions: () -> Unit,
     onEnableBluetooth: () -> Unit,
+    onEnableWifi: () -> Unit,
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
     onConnect: (CameraAdvert) -> Unit,
     onDisconnect: () -> Unit,
+    onSetFlip: (Boolean) -> Unit,
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Otoscope") },
+                actions = {
+                    DeviceActions(
+                        state = state,
+                        permissionsGranted = permissionsGranted,
+                        onEnableBluetooth = onEnableBluetooth,
+                        onEnableWifi = onEnableWifi,
+                        onStartScan = onStartScan,
+                        onStopScan = onStopScan,
+                        onDisconnect = onDisconnect,
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -77,13 +91,12 @@ fun OtoscopeScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (state) {
-                is CameraState.Streaming -> StreamingView(state, onDisconnect)
+                is CameraState.Streaming -> StreamingView(state, onDisconnect, onSetFlip)
                 else -> ScanView(
                     state = state,
                     adverts = adverts,
                     permissionsGranted = permissionsGranted,
                     onRequestPermissions = onRequestPermissions,
-                    onEnableBluetooth = onEnableBluetooth,
                     onStartScan = onStartScan,
                     onStopScan = onStopScan,
                     onConnect = onConnect,
@@ -95,12 +108,58 @@ fun OtoscopeScreen(
 }
 
 @Composable
+private fun DeviceActions(
+    state: CameraState,
+    permissionsGranted: Boolean,
+    onEnableBluetooth: () -> Unit,
+    onEnableWifi: () -> Unit,
+    onStartScan: () -> Unit,
+    onStopScan: () -> Unit,
+    onDisconnect: () -> Unit,
+) {
+    when {
+        state is CameraState.Streaming -> {
+            OutlinedButton(onClick = onDisconnect) {
+                Text("Disconnect")
+            }
+        }
+        state is CameraState.Scanning || state is CameraState.Found -> {
+            OutlinedButton(onClick = onStopScan) {
+                Icon(Icons.Default.Stop, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Stop")
+            }
+        }
+        state is CameraState.BluetoothOff -> {
+            Button(onClick = onEnableBluetooth) {
+                Icon(Icons.Default.Bluetooth, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Turn on Bluetooth")
+            }
+        }
+        state is CameraState.WifiOff -> {
+            Button(onClick = onEnableWifi) {
+                Icon(Icons.Default.Wifi, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Turn on Wi-Fi")
+            }
+        }
+        permissionsGranted && state !is CameraState.Connecting -> {
+            Button(onClick = onStartScan) {
+                Icon(Icons.Default.Bluetooth, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Scan")
+            }
+        }
+    }
+}
+
+@Composable
 private fun ScanView(
     state: CameraState,
     adverts: List<CameraAdvert>,
     permissionsGranted: Boolean,
     onRequestPermissions: () -> Unit,
-    onEnableBluetooth: () -> Unit,
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
     onConnect: (CameraAdvert) -> Unit,
@@ -120,52 +179,34 @@ private fun ScanView(
                 }
             }
             state is CameraState.BluetoothOff -> {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.BluetoothDisabled, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Bluetooth is off", style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = onEnableBluetooth) {
-                        Icon(Icons.Default.Bluetooth, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Turn on Bluetooth")
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.BluetoothDisabled, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text("Bluetooth is off — use the button above to turn it on.")
                 }
             }
             state is CameraState.WifiOff -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.WifiOff, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text("Wi-Fi is off — turn it on to talk to the camera.")
+                    Text("Wi-Fi is off — use the button above to turn it on.")
                 }
             }
             state is CameraState.Scanning || state is CameraState.Found -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(onClick = onStopScan) {
-                        Icon(Icons.Default.Stop, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("Stop scan")
-                    }
-                    Spacer(Modifier.size(12.dp))
                     CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.size(12.dp))
+                    Text("Scanning for camera...", style = MaterialTheme.typography.bodyMedium)
                 }
             }
-            else -> {
-                Button(onClick = onStartScan) {
-                    Icon(Icons.Default.Bluetooth, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    Text("Scan for camera")
-                }
-            }
+            else -> Unit
         }
 
         Spacer(Modifier.height(16.dp))
 
         if (adverts.isEmpty()) {
             Text(
-                "Power on the otoscope and hit Scan. It will appear here as soon as we " +
+                "Power on the otoscope and tap Scan. It will appear here as soon as we " +
                     "pick up its BLE advertisement.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -228,11 +269,16 @@ private fun ErrorHeader(message: String) {
 }
 
 @Composable
-private fun StreamingView(state: CameraState.Streaming, onDisconnect: () -> Unit) {
+private fun StreamingView(
+    state: CameraState.Streaming,
+    onDisconnect: () -> Unit,
+    onSetFlip: (Boolean) -> Unit,
+) {
     val frame by state.frame.collectAsStateWithLifecycle()
     val rotation by state.rotation.collectAsStateWithLifecycle()
     val model by state.model.collectAsStateWithLifecycle()
     val battery by state.battery.collectAsStateWithLifecycle()
+    val flipEnabled by state.flipEnabled.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -241,12 +287,32 @@ private fun StreamingView(state: CameraState.Streaming, onDisconnect: () -> Unit
         CameraFrame(
             frame = frame,
             rotationDegrees = rotation,
+            flipEnabled = flipEnabled,
             modifier = Modifier.fillMaxWidth()
         )
 
         CameraStatus(modelName = model, ssid = state.advert.ssid, battery = battery)
 
-        OutlinedButton(onClick = onDisconnect) { Text("Disconnect") }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Mirror view",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Check to examine yourself, uncheck to examine someone else.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Checkbox(
+                checked = flipEnabled,
+                onCheckedChange = onSetFlip,
+            )
+        }
     }
 }
 

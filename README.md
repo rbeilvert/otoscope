@@ -42,9 +42,9 @@ For signed release builds, see [`docs/RELEASING.md`](docs/RELEASING.md).
 | Wi-Fi join (open AP)   | done  |
 | Live video             | done — MJPEG decoded in-app |
 | Auto-rotate + circular mask | done — driven by camera accelerometer |
+| Image flip (self-inspection) | done — horizontal mirror toggle with rotation correction |
 | Photo / video capture  | not implemented yet |
 | Brightness (PWM) control | not implemented yet |
-| YUYV format            | not implemented (camera defaults to MJPEG; YUYV path returns no frame) |
 
 ## License
 

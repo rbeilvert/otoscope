@@ -1,0 +1,1 @@
+Add a "Mirror view" toggle to flip the image horizontally (with rotation correction) for self-examination. Move Bluetooth enabling into the top bar and add a button to turn on Wi-Fi from the app.
