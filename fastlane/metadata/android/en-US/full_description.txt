@@ -1,13 +1,19 @@
-Otoscope is a clean, ad-free replacement for the proprietary apps shipped with cheap Wi-Fi otoscope cameras (Xylla / Wudaopu hardware, and similar JesHome / Enjoy-branded devices).
+Otoscope is a clean, ad-free replacement for the proprietary apps shipped with cheap Wi-Fi otoscope cameras.
 
-The stock companion app — "AIR-Look" — bundles a dozen ad and analytics SDKs (AdMob, AppLovin, IronSource, MBridge, Vungle, Pangle, Mintegral, etc.). Otoscope reimplements just the connection and viewer functionality, with nothing else.
+The stock companion apps — "AIR-Look" (Wudaopu / Xylla hardware) and "EarVision" (Shenzhen Jiding / JEGOAT hardware) — bundle a dozen ad and analytics SDKs (AdMob, AppLovin, IronSource, MBridge, Vungle, Pangle, Mintegral, etc.) and a sprinkling of in-app tracking. Otoscope reimplements just the connection and viewer functionality, with nothing else.
 
 Features:
 
 * Discover the camera over Bluetooth Low Energy.
-* Join the camera's open Wi-Fi access point in a one-process scope, so the rest of your traffic is not affected.
-* Live video stream, decoded in-app over the camera's custom UDP protocol.
-* Auto-rotation driven by the camera's on-board accelerometer.
+* Join the camera's Wi-Fi access point in a one-process scope, so the rest of your traffic isn't affected.
+* Live video stream, decoded in-app over the camera's UDP protocol — pure Kotlin, no FFmpeg, no native blobs.
+* Auto-rotation driven by the camera's on-board accelerometer / gyro.
+* Horizontal-mirror toggle for self-examination.
 * Circular mask matching the otoscope lens.
+
+Supported hardware families (the right protocol is selected automatically from the BLE advertisement):
+
+* Wudaopu / Xylla — Wi-Fi SSID `Enjoy-XXXXXX` or `JesHome-XXXX`, open AP.
+* Shenzhen Jiding / JEGOAT — Wi-Fi SSID `softish-XXXXXX`, WPA2.
 
 Otoscope is GPL-3.0-or-later and contains no third-party trackers, ad SDKs, or proprietary native libraries.

@@ -18,16 +18,13 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * Joins the camera's open WiFi access point.
+ * Joins the camera's WiFi access point. Uses [WifiNetworkSpecifier] (API 29+)
+ * so the camera network exists only for the lifetime of the process binding
+ * and the user's saved WiFi config isn't touched.
  *
- * The camera publishes an unsecured SSID (e.g. "Enjoy-3B3D90") tied to a known BSSID
- * we extracted from the BLE advert. We use [WifiNetworkSpecifier] (API 29+) so we
- * don't permanently change the user's WiFi config — the camera network exists only
- * for the lifetime of the process binding.
- *
- * The original AIR-Look app also files a [WifiNetworkSuggestion] in parallel; we do
- * the same because some Android skins (MIUI, OneUI) need the suggestion to show the
- * inline connect notification cleanly instead of bouncing the user out to Settings.
+ * A [WifiNetworkSuggestion] is filed in parallel because some Android skins
+ * (MIUI, OneUI) need it to show the inline connect notification cleanly
+ * instead of bouncing the user out to Settings.
  */
 class CameraWifiConnector(context: Context) {
 
@@ -69,10 +66,12 @@ class CameraWifiConnector(context: Context) {
         }.onFailure { Log.w(TAG, "Suggestion failed: ${it.message}") }
 
         // 2. File the specifier request. This is what actually establishes the
-        //    bound network we'll send UDP through.
+        //    bound network we'll send UDP through. Wudaopu APs are open; JEGOAT
+        //    is WPA2 with a per-camera passphrase carried in the BLE advert.
         val specifier = WifiNetworkSpecifier.Builder()
             .setSsid(advert.ssid)
             .setBssid(MacAddress.fromString(advert.bssid))
+            .apply { advert.wpa2Passphrase?.let { setWpa2Passphrase(it) } }
             .build()
 
         val request = NetworkRequest.Builder()

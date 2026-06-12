@@ -36,8 +36,9 @@ captures/
 *.keystore
 keystore.properties
 
-# Reverse-engineering artifacts (kept locally, not shared)
+# Reverse-engineering artifacts and config (kept locally, not shared)
 .research/
+.python-version
 
 # OS
 .DS_Store

@@ -48,8 +48,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.rubec.otoscope.BuildConfig
 import dev.rubec.otoscope.ble.CameraAdvert
-import dev.rubec.otoscope.stream.OtoscopeControlClient
+import dev.rubec.otoscope.stream.BatteryStatus
 import dev.rubec.otoscope.vm.CameraState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -167,7 +168,7 @@ private fun ScanView(
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
         when (state) {
-            is CameraState.Connecting -> ConnectingHeader(state.advert.ssid)
+            is CameraState.Connecting -> ConnectingHeader(state.advert.ssid, state.attempt, state.totalAttempts)
             is CameraState.Error -> ErrorHeader(state.message)
             else -> Unit
         }
@@ -247,11 +248,20 @@ private fun CameraCard(advert: CameraAdvert, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ConnectingHeader(ssid: String) {
+private fun ConnectingHeader(ssid: String, attempt: Int, totalAttempts: Int) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
         CircularProgressIndicator(modifier = Modifier.size(18.dp))
         Spacer(Modifier.size(12.dp))
-        Text("Joining $ssid…", style = MaterialTheme.typography.bodyMedium)
+        Column {
+            Text("Joining $ssid…", style = MaterialTheme.typography.bodyMedium)
+            if (totalAttempts > 1 && attempt > 1) {
+                Text(
+                    "Attempt $attempt of $totalAttempts",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -278,6 +288,7 @@ private fun StreamingView(
     val rotation by state.rotation.collectAsStateWithLifecycle()
     val model by state.model.collectAsStateWithLifecycle()
     val battery by state.battery.collectAsStateWithLifecycle()
+    val diagnostics by state.diagnostics.collectAsStateWithLifecycle()
     val flipEnabled by state.flipEnabled.collectAsStateWithLifecycle()
 
     Column(
@@ -313,6 +324,29 @@ private fun StreamingView(
                 onCheckedChange = onSetFlip,
             )
         }
+
+        if (BuildConfig.DEBUG && diagnostics.isNotEmpty()) {
+            DiagnosticsOverlay(diagnostics)
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticsOverlay(values: Map<String, String>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        for ((key, value) in values) {
+            Text(
+                "$key: $value",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -320,7 +354,7 @@ private fun StreamingView(
 private fun CameraStatus(
     modelName: String?,
     ssid: String,
-    battery: OtoscopeControlClient.Battery?,
+    battery: BatteryStatus?,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -345,7 +379,7 @@ private fun CameraStatus(
 }
 
 @Composable
-private fun BatteryBadge(battery: OtoscopeControlClient.Battery?) {
+private fun BatteryBadge(battery: BatteryStatus?) {
     if (battery == null) return
     val pct = battery.percent.coerceIn(0, 100)
     val icon = when {

@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
+import dev.rubec.otoscope.vendor.CameraVendors
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -22,10 +23,12 @@ class CameraBleScanner(context: Context) {
 
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
-                val advert = CameraAdvert.parse(
-                    deviceName = result.device?.name ?: result.scanRecord?.deviceName,
+                val device = result.device ?: return
+                val advert = CameraVendors.parseAdvert(
+                    bleAddress = device.address,
+                    deviceName = device.name ?: result.scanRecord?.deviceName,
                     scanRecord = result.scanRecord?.bytes,
-                    rssi = result.rssi
+                    rssi = result.rssi,
                 )
                 if (advert != null) trySend(advert)
             }

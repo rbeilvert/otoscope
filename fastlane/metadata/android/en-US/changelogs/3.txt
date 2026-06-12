@@ -1,0 +1,2 @@
+- Adds support for a second camera family: Shenzhen Jiding "softish-XXXXXX" otoscopes
+- Ships under-the-hood improvements: hardware-accelerated JPEG decoding for smoother video, better frame reassembly for fewer visual glitches, and an auto-retry to fix first-try pairing failures.
