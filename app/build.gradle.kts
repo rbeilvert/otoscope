@@ -11,7 +11,6 @@ plugins {
 //   storePassword=...
 //   keyAlias=rubec
 //   keyPassword=...
-// See docs/RELEASING.md for the keytool command. The file is gitignored.
 val keystoreProperties = Properties().apply {
     val propsFile = rootProject.file("keystore.properties")
     if (propsFile.exists()) load(propsFile.inputStream())
@@ -26,8 +25,8 @@ android {
         applicationId = "dev.rubec.otoscope"
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
 
         vectorDrawables { useSupportLibrary = true }
     }

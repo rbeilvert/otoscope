@@ -1,21 +1,25 @@
 # Otoscope
 
-A FOSS Android app for cheap Wi-Fi otoscope cameras. Reverse-engineered drop-in replacement for the proprietary "AIR-Look" app, with none of its ad SDKs or trackers.
+A FOSS Android app for cheap Wi-Fi otoscope cameras. Reverse-engineered drop-in replacement for the proprietary companion apps these cameras ship with, with none of their ad SDKs, analytics, or trackers.
 
 - Discovers the camera over Bluetooth Low Energy.
-- Joins the camera's open Wi-Fi access point in an isolated, process-bound network — no impact on your normal Wi-Fi.
-- Streams live video over the camera's custom UDP protocol (no proprietary `.so`, no FFmpeg dependency).
-- Auto-rotates the image using the camera's on-board accelerometer, clipped to a circular mask matching the otoscope lens.
+- Joins the camera's Wi-Fi access point in an isolated, process-bound network — no impact on your saved Wi-Fi config.
+- Streams live video over the camera's UDP protocol (pure Kotlin, no proprietary `.so`, no FFmpeg dependency).
+- Auto-rotates the image using the camera's on-board accelerometer / gyro, clipped to a circular mask matching the otoscope lens.
+- Horizontal-mirror toggle for self-examination.
 
 ## Hardware compatibility
 
-Cameras that advertise a Wi-Fi access point named `Enjoy-XXXXXX` or `JesHome-XXXX` and pair with the AIR-Look app should work. Confirmed:
+The app supports two camera families. The hardware is identified by its BLE advertisement, and the right protocol is selected automatically.
 
-| Brand / SSID prefix | Manufacturer | Status |
-| ------------------- | ------------ | ------ |
-| `Enjoy-XXXXXX`      | Wudaopu / Xylla | working |
+| Family | SSID prefix | Wi-Fi auth | Companion app | Status |
+| ------ | ----------- | ---------- | ------------- | ------ |
+| Wudaopu / Xylla | `Enjoy-XXXXXX`, `JesHome-XXXX` | open | "AIR-Look" (`com.air.airlook`) | working |
+| Shenzhen Jiding / JEGOAT | `softish-XXXXXX` | WPA2 | "EarVision" (`com.atomath.wifi_camera`) | working |
 
-The BLE advert format (manufacturer-data magic `0x66 0x99` followed by the Wi-Fi BSSID) and the on-the-wire camera protocol (`UDP/8032` cmd channel with `0x99 0x99` magic, 24-byte chunk header with `0x66` magic carrying MJPEG payload) are reverse-engineered from a packet capture and the closed-source `libmlcamera-2.5.so`. If you have a similar otoscope that doesn't pair, please file an issue with a screenshot of the BLE advert (e.g. from nRF Connect) and the scan/connect logs.
+If you have a Wi-Fi otoscope that pairs with one of those apps but isn't picked up by Otoscope,
+please file an issue including preferably the original companion application ID,
+a screenshot of the BLE advertisement (e.g. from nRF Connect) and any scan/connect logs from `adb logcat`.
 
 ## Build
 
@@ -32,20 +36,20 @@ gradle wrapper --gradle-version 8.10.2 --distribution-type bin
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-For signed release builds, see [`docs/RELEASING.md`](docs/RELEASING.md).
 
 ## Status
 
 | Feature                | State |
 | ---------------------- | ----- |
-| BLE discovery          | done  |
-| Wi-Fi join (open AP)   | done  |
+| BLE discovery          | done — multi-vendor |
+| Wi-Fi join (open or WPA2) | done |
 | Live video             | done — MJPEG decoded in-app |
-| Auto-rotate + circular mask | done — driven by camera accelerometer |
-| Image flip (self-inspection) | done — horizontal mirror toggle with rotation correction |
+| Auto-rotate + circular mask | done — driven by camera accelerometer / gyro |
+| Horizontal-mirror toggle | done — for self-examination |
+| Battery + model readout | done — where the camera exposes it |
 | Photo / video capture  | not implemented yet |
 | Brightness (PWM) control | not implemented yet |
 
 ## License
 
-[GPL-3.0-or-later](LICENSE). The project is independent of and not affiliated with Xylla, Wudaopu, or any of the brands behind the "AIR-Look" app. All trademark references are nominative.
+[GPL-3.0-or-later](LICENSE). The project is independent of and not affiliated with Xylla, Wudaopu, Shenzhen Jiding, or any of the brands behind the proprietary companion apps. All trademark references are nominative.

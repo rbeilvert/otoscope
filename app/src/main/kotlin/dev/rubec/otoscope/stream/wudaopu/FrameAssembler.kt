@@ -1,10 +1,10 @@
-package dev.rubec.otoscope.stream
+package dev.rubec.otoscope.stream.wudaopu
 
 /**
- * Assembles the chunked video frames the otoscope camera sends over UDP.
+ * Assembles the chunked video frames the Wudaopu otoscope sends over UDP/8032.
  *
  * Each UDP datagram carries a 24-byte header followed by `chunk_len` bytes of
- * payload. The full wire format (reversed from `libmlcamera-2.5.so`):
+ * payload:
  *
  *   offset  size  field
  *   ------  ----  -----
@@ -17,24 +17,30 @@ package dev.rubec.otoscope.stream
  *     10-11  u16  height
  *     12-13  u16  chunk_seq (0-based per frame)
  *     14-15  u16  chunk_len (bytes of payload in this datagram)
- *     16-19  u32  timestamp/id
+ *     16-19  u32  packed accelerometer reading (3×10 bits, decoded by RotationFilter)
  *     20-23  u32  reserved
  *     24..   ..   payload
  */
-class FrameAssembler {
+internal class FrameAssembler {
 
-    data class Frame(
-        val data: ByteArray,
-        val format: Int,
-        val width: Int,
-        val height: Int,
-        /** Packed accelerometer reading from the camera at offset 16 of the header.
-         *  Three 10-bit axes (X high, Z low). Decoded by [RotationFilter]. */
-        val accelerometer: Int,
-    )
-
-    enum class FeedResult { Frame, Building, Dropped, Invalid }
-    data class Outcome(val result: FeedResult, val frame: Frame? = null)
+    sealed interface Outcome {
+        /** A complete frame, ready to decode. */
+        data class Frame(
+            val data: ByteArray,
+            val format: Int,
+            val width: Int,
+            val height: Int,
+            /** Packed accelerometer reading at offset 16 of every chunk header —
+             *  three 10-bit axes (X high, Z low). Decoded by [RotationFilter]. */
+            val accelerometer: Int,
+        ) : Outcome
+        /** Chunk recorded, frame not yet complete. */
+        data object Building : Outcome
+        /** A frame in flight was dropped (missing chunks, size mismatch, etc.). */
+        data object Dropped : Outcome
+        /** Packet too short, wrong magic, or otherwise unparseable. */
+        data object Invalid : Outcome
+    }
 
     private var buffer: ByteArray? = null
     private var format = 0
@@ -53,18 +59,17 @@ class FrameAssembler {
     }
 
     fun feed(packet: ByteArray, len: Int): Outcome {
-        if (len < HEADER_SIZE) return Outcome(FeedResult.Invalid)
-        if (packet[0] != MAGIC) return Outcome(FeedResult.Invalid)
+        if (len < HEADER_SIZE) return Outcome.Invalid
+        if (packet[0] != PACKET_HEADER_PREFIX) return Outcome.Invalid
 
         val totalSize = readU32LE(packet, 4)
         val chunkSeq = readU16LE(packet, 12)
         val chunkLen = readU16LE(packet, 14)
 
-        if (chunkLen <= 0 || chunkLen + HEADER_SIZE > len) return Outcome(FeedResult.Invalid)
-        if (totalSize <= 0 || totalSize > MAX_FRAME_SIZE) return Outcome(FeedResult.Invalid)
+        if (chunkLen <= 0 || chunkLen + HEADER_SIZE > len) return Outcome.Invalid
+        if (totalSize <= 0 || totalSize > MAX_FRAME_SIZE) return Outcome.Invalid
 
-        // New frame begins when chunk_seq resets, OR when the total size differs,
-        // OR we haven't started yet.
+        // New frame begins on chunk_seq=0, on a size mismatch, or fresh start.
         val isNewFrame = buffer == null ||
             totalSize != expectedSize ||
             chunkSeq < lastChunkSeq ||
@@ -81,31 +86,28 @@ class FrameAssembler {
         }
 
         if (chunkSeq != lastChunkSeq + 1) {
-            // Out-of-order or duplicate — drop the in-flight frame.
             reset()
-            return Outcome(FeedResult.Dropped)
+            return Outcome.Dropped
         }
 
         if (accumulatedSize + chunkLen > expectedSize) {
             reset()
-            return Outcome(FeedResult.Dropped)
+            return Outcome.Dropped
         }
 
         System.arraycopy(packet, HEADER_SIZE, buffer!!, accumulatedSize, chunkLen)
         accumulatedSize += chunkLen
         lastChunkSeq = chunkSeq
-        // The accelerometer reading travels in every chunk's header; remember the
-        // most recent one — that's what the original native lib stores at frame end.
         accelerometer = readU32LE(packet, 16)
 
         return if (accumulatedSize == expectedSize) {
-            val frame = Frame(buffer!!, format, width, height, accelerometer)
+            val frame = Outcome.Frame(buffer!!, format, width, height, accelerometer)
             buffer = null
             accumulatedSize = 0
             lastChunkSeq = -1
-            Outcome(FeedResult.Frame, frame)
+            frame
         } else {
-            Outcome(FeedResult.Building)
+            Outcome.Building
         }
     }
 
@@ -120,8 +122,7 @@ class FrameAssembler {
 
     companion object {
         const val HEADER_SIZE = 24
-        const val MAGIC: Byte = 0x66
-        // Camera spec maxes around 1080p MJPEG; 4 MB is plenty and bounds bad reads.
+        const val PACKET_HEADER_PREFIX: Byte = 0x66
         private const val MAX_FRAME_SIZE = 4 * 1024 * 1024
 
         const val FORMAT_MJPEG = 1

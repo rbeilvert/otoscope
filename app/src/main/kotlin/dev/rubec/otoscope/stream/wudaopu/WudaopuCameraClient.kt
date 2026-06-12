@@ -1,9 +1,11 @@
-package dev.rubec.otoscope.stream
+package dev.rubec.otoscope.stream.wudaopu
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Network
 import android.util.Log
+import dev.rubec.otoscope.stream.JpegDecoder
+import dev.rubec.otoscope.stream.SessionStats
+import dev.rubec.otoscope.stream.toHex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,7 +27,14 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketTimeoutException
 
-class OtoscopeCameraClient(
+/**
+ * Wudaopu video-stream client. Sends a "start preview" cmd on UDP/8032, reads
+ * 24-byte-header MJPEG/YUYV chunks back on the same socket, assembles frames
+ * via [FrameAssembler], and decodes them to Bitmaps.
+ *
+ * Vendor-specific wire format details are in `FrameAssembler.kt`.
+ */
+internal class WudaopuCameraClient(
     private val cameraIp: String,
     private val network: Network?,
     private val cmdPort: Int = 8032,
@@ -38,22 +47,14 @@ class OtoscopeCameraClient(
     private val _frames = MutableSharedFlow<Bitmap>(replay = 0, extraBufferCapacity = 2)
     val frames: SharedFlow<Bitmap> = _frames.asSharedFlow()
 
-    /** Camera rotation in degrees, derived from the camera's on-board accelerometer. */
+    /** Camera rotation in degrees, derived from the on-board accelerometer. */
     private val _rotation = MutableStateFlow(0f)
     val rotation: StateFlow<Float> = _rotation.asStateFlow()
 
     private val rotationFilter = RotationFilter()
 
-    data class Stats(
-        val packetsReceived: Long = 0,
-        val framesReceived: Long = 0,
-        val framesDropped: Long = 0,
-        val bytesReceived: Long = 0,
-        val lastError: String? = null,
-    )
-
-    private val _stats = MutableStateFlow(Stats())
-    val stats: StateFlow<Stats> = _stats.asStateFlow()
+    private val _stats = MutableStateFlow(SessionStats())
+    val stats: StateFlow<SessionStats> = _stats.asStateFlow()
 
     fun start() {
         if (runJob != null) return
@@ -76,7 +77,8 @@ class OtoscopeCameraClient(
         val cameraAddr = InetAddress.getByName(cameraIp)
         val cmdAddr = InetSocketAddress(cameraAddr, cmdPort)
 
-        // Initial start cmd burst (11x, mirroring the original UDP-reliability strategy).
+        // Burst the start cmd 11x — UDP is lossy and the camera ignores the
+        // first few packets if the AP is still settling.
         sendCmd(sock, cmdAddr, CMD_START_PREVIEW, burst = 11)
 
         val keepalive = scope.launch {
@@ -116,27 +118,24 @@ class OtoscopeCameraClient(
                     Log.i(TAG, "first packet $len bytes: ${recvBuf.toHex(0, minOf(len, 32))}")
                 }
 
-                val outcome = assembler.feed(recvBuf, len)
-                when (outcome.result) {
-                    FrameAssembler.FeedResult.Frame -> {
-                        val frame = outcome.frame ?: continue
-                        val bmp = decode(frame)
+                when (val outcome = assembler.feed(recvBuf, len)) {
+                    is FrameAssembler.Outcome.Frame -> {
+                        val bmp = decode(outcome)
                         if (bmp != null) {
-                            _rotation.value = rotationFilter.update(frame.accelerometer)
+                            _rotation.value = rotationFilter.update(outcome.accelerometer)
                             _frames.tryEmit(bmp)
                             _stats.update { it.copy(framesReceived = it.framesReceived + 1) }
                         } else {
                             _stats.update { it.copy(
                                 framesDropped = it.framesDropped + 1,
-                                lastError = "decode failed (fmt=${frame.format}, ${frame.width}x${frame.height}, ${frame.data.size}B)",
+                                lastError = "decode failed (fmt=${outcome.format}, ${outcome.width}x${outcome.height}, ${outcome.data.size}B)",
                             ) }
                         }
                     }
-                    FrameAssembler.FeedResult.Dropped -> {
+                    FrameAssembler.Outcome.Dropped ->
                         _stats.update { it.copy(framesDropped = it.framesDropped + 1) }
-                    }
-                    FrameAssembler.FeedResult.Building,
-                    FrameAssembler.FeedResult.Invalid -> Unit
+                    FrameAssembler.Outcome.Building,
+                    FrameAssembler.Outcome.Invalid -> Unit
                 }
             }
         } finally {
@@ -144,9 +143,8 @@ class OtoscopeCameraClient(
         }
     }
 
-    private fun decode(frame: FrameAssembler.Frame): Bitmap? = when (frame.format) {
-        FrameAssembler.FORMAT_MJPEG ->
-            BitmapFactory.decodeByteArray(frame.data, 0, frame.data.size)
+    private fun decode(frame: FrameAssembler.Outcome.Frame): Bitmap? = when (frame.format) {
+        FrameAssembler.FORMAT_MJPEG -> JpegDecoder.decode(frame.data)
         FrameAssembler.FORMAT_YUYV -> null // not yet implemented
         else -> null
     }
@@ -171,11 +169,9 @@ class OtoscopeCameraClient(
     }
 
     companion object {
-        private const val TAG = "OtoscopeClient"
+        private const val TAG = "WudaopuClient"
         private const val CMD_START_PREVIEW = 1
+        @Suppress("unused")
         private const val CMD_STOP_PREVIEW = 2
     }
 }
-
-private fun ByteArray.toHex(off: Int, len: Int): String =
-    (off until off + len).joinToString(" ") { "%02x".format(this[it]) }

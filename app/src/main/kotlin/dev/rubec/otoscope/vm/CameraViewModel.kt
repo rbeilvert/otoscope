@@ -9,8 +9,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.rubec.otoscope.ble.CameraAdvert
 import dev.rubec.otoscope.ble.CameraBleScanner
-import dev.rubec.otoscope.stream.OtoscopeCameraClient
-import dev.rubec.otoscope.stream.OtoscopeControlClient
+import dev.rubec.otoscope.stream.BatteryStatus
+import dev.rubec.otoscope.stream.CameraSession
 import dev.rubec.otoscope.wifi.CameraWifiConnector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 sealed interface CameraState {
@@ -30,14 +29,19 @@ sealed interface CameraState {
     data object WifiOff : CameraState
     data object Scanning : CameraState
     data class Found(val advert: CameraAdvert) : CameraState
-    data class Connecting(val advert: CameraAdvert) : CameraState
+    data class Connecting(
+        val advert: CameraAdvert,
+        val attempt: Int = 1,
+        val totalAttempts: Int = 1,
+    ) : CameraState
     data class Streaming(
         val advert: CameraAdvert,
-        val client: OtoscopeCameraClient,
+        val session: CameraSession,
         val frame: StateFlow<Bitmap?>,
         val rotation: StateFlow<Float>,
         val model: StateFlow<String?>,
-        val battery: StateFlow<OtoscopeControlClient.Battery?>,
+        val battery: StateFlow<BatteryStatus?>,
+        val diagnostics: StateFlow<Map<String, String>>,
         val flipEnabled: StateFlow<Boolean>,
     ) : CameraState
     data class Error(val message: String) : CameraState
@@ -56,7 +60,6 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     val adverts: StateFlow<List<CameraAdvert>> = _adverts.asStateFlow()
 
     private var scanJob: Job? = null
-    private var sessionJobs: MutableList<Job> = mutableListOf()
 
     /** Horizontal-mirror state for the active stream. Owned here so the UI
      *  reads it read-only and routes toggles back through [setFlipEnabled]. */
@@ -103,56 +106,65 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     fun connect(advert: CameraAdvert) {
         stopScan()
-        _state.value = CameraState.Connecting(advert)
+        _state.value = CameraState.Connecting(advert, attempt = 1, totalAttempts = CONNECT_ATTEMPTS)
         viewModelScope.launch {
-            runCatching { wifi.connect(advert) }
-                .onSuccess { startStreaming(advert) }
-                .onFailure {
-                    _state.value = CameraState.Error(it.message ?: "WiFi connect failed")
+            // Pairing is occasionally flaky on the first try — the BLE knock can
+            // return before the camera's AP is fully advertised, or the
+            // WifiNetworkSpecifier request can time out on a slow boot. Retry
+            // with a short backoff before surfacing an error.
+            var lastError: String? = null
+            repeat(CONNECT_ATTEMPTS) { attempt ->
+                _state.value = CameraState.Connecting(
+                    advert = advert,
+                    attempt = attempt + 1,
+                    totalAttempts = CONNECT_ATTEMPTS,
+                )
+                if (attempt > 0) delay(RETRY_BACKOFF_MS)
+                try {
+                    Log.i(TAG, "connect attempt ${attempt + 1}/${CONNECT_ATTEMPTS} for ${advert.vendor.displayName}")
+                    // Some vendors (JEGOAT) need a BLE GATT read to make the
+                    // camera bring its AP up. No-op for vendors with always-on
+                    // APs.
+                    advert.vendor.preWifiHandshake(getApplication(), advert)
+                    // Brief wait between the knock and the WiFi connect — the
+                    // camera takes a moment to start broadcasting after being
+                    // woken up.
+                    delay(POST_KNOCK_DELAY_MS)
+                    wifi.connect(advert)
+                    startStreaming(advert)
+                    return@launch
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "attempt ${attempt + 1} failed: ${e.message}")
+                    lastError = e.message
+                    // Clean up any partial state from this attempt before retrying.
+                    wifi.disconnect()
                 }
+            }
+            _state.value = CameraState.Error(lastError ?: "Connect failed")
         }
     }
 
     private fun startStreaming(advert: CameraAdvert) {
-        val cameraIp = wifi.gatewayIp ?: "192.168.0.10"
-        Log.i(TAG, "starting otoscope client on $cameraIp (local=${wifi.localIp})")
+        val cameraIp = wifi.gatewayIp ?: advert.vendor.defaultCameraIp
+        Log.i(TAG, "starting ${advert.vendor.displayName} session on $cameraIp (local=${wifi.localIp})")
 
-        val camera = OtoscopeCameraClient(cameraIp = cameraIp, network = wifi.currentNetwork)
-        val control = OtoscopeControlClient(cameraIp = cameraIp, network = wifi.currentNetwork)
-
-        val frameState = camera.frames
-            .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null as Bitmap?)
-        val modelState = MutableStateFlow<String?>(null)
-        val batteryState = MutableStateFlow<OtoscopeControlClient.Battery?>(null)
+        val session = advert.vendor.createSession(network = wifi.currentNetwork, cameraIp = cameraIp)
         flipEnabled.value = true
+        session.start()
 
-        camera.start()
-
-        // Identify the camera once, then poll the battery on a slow cadence.
-        sessionJobs += viewModelScope.launch {
-            // The board-info command sometimes loses to the streaming start cmd
-            // burst — retry a few times until the camera answers.
-            var attempts = 0
-            while (isActive && modelState.value == null && attempts < 6) {
-                control.getBoardInfo()?.let { modelState.value = it.model }
-                attempts += 1
-                if (modelState.value == null) delay(1000)
-            }
-        }
-        sessionJobs += viewModelScope.launch {
-            while (isActive) {
-                control.getBattery()?.let { batteryState.value = it }
-                delay(2000)
-            }
-        }
+        val frameState = session.frames
+            .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null as Bitmap?)
 
         _state.value = CameraState.Streaming(
             advert = advert,
-            client = camera,
+            session = session,
             frame = frameState,
-            rotation = camera.rotation,
-            model = modelState.asStateFlow(),
-            battery = batteryState.asStateFlow(),
+            rotation = session.rotation,
+            model = session.model,
+            battery = session.battery,
+            diagnostics = session.diagnostics,
             flipEnabled = flipEnabled.asStateFlow(),
         )
     }
@@ -162,9 +174,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun disconnect() {
-        sessionJobs.forEach { it.cancel() }
-        sessionJobs.clear()
-        (state.value as? CameraState.Streaming)?.client?.close()
+        (state.value as? CameraState.Streaming)?.session?.close()
         wifi.disconnect()
         _state.value = CameraState.Idle
     }
@@ -176,5 +186,8 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         private const val TAG = "CameraViewModel"
+        private const val CONNECT_ATTEMPTS = 3
+        private const val RETRY_BACKOFF_MS = 1_500L
+        private const val POST_KNOCK_DELAY_MS = 500L
     }
 }
