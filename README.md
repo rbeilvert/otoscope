@@ -1,9 +1,18 @@
-# Otoscope
+<h1 align="center">
+<a href="https://github.com/rbeilvert/otoscope/"><img align="center" src="fastlane/metadata/android/en-US/images/icon.png" alt="otoscope" width="100" /></a><br>
+Otoscope
+</h1>
 
-A FOSS Android app for cheap Wi-Fi otoscope cameras. Reverse-engineered drop-in replacement for the proprietary companion apps these cameras ship with, with none of their ad SDKs, analytics, or trackers.
+<p align="center">
+    A FOSS Android app for cheap Wi-Fi otoscope cameras.
+</p>
+
+---
+
+Otoscope is a reverse-engineered drop-in replacement for the proprietary companion apps these cameras ship with, with none of their ad SDKs, analytics, or trackers.
 
 - Discovers the camera over Bluetooth Low Energy.
-- Joins the camera's Wi-Fi access point in an isolated, process-bound network — no impact on your saved Wi-Fi config.
+- Joins the camera's Wi-Fi access point in an isolated, process-bound network. No impact on your saved Wi-Fi config.
 - Streams live video over the camera's UDP protocol (pure Kotlin, no proprietary `.so`, no FFmpeg dependency).
 - Auto-rotates the image using the camera's on-board accelerometer / gyro, clipped to a circular mask matching the otoscope lens.
 - Horizontal-mirror toggle for self-examination.
@@ -39,16 +48,16 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## Status
 
-| Feature                | State |
-| ---------------------- | ----- |
-| BLE discovery          | done — multi-vendor |
-| Wi-Fi join (open or WPA2) | done |
-| Live video             | done — MJPEG decoded in-app |
-| Auto-rotate + circular mask | done — driven by camera accelerometer / gyro |
-| Horizontal-mirror toggle | done — for self-examination |
-| Battery + model readout | done — where the camera exposes it |
-| Photo / video capture  | not implemented yet |
-| Brightness (PWM) control | not implemented yet |
+| Feature                     | State |
+| --------------------------- | ----- |
+| BLE discovery               | ✅ multi-vendor |
+| Wi-Fi join                  | ✅ open or WPA2 |
+| Live video                  | ✅ MJPEG decoded in-app |
+| Auto-rotate + circular mask | ✅ driven by camera accelerometer / gyro |
+| Horizontal-mirror toggle    | ✅ for self-examination |
+| Battery + model readout     | ✅ where the camera exposes it |
+| Photo / video capture       | not implemented yet |
+| Brightness (PWM) control    | not implemented yet |
 
 ## License
 
