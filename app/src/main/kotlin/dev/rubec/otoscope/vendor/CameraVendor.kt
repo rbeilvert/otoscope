@@ -57,7 +57,9 @@ interface CameraVendor {
 
 /** Central registry of all supported vendors. */
 object CameraVendors {
-    val all: List<CameraVendor> = listOf(WudaopuVendor, JegoatVendor)
+    // iTiMO is checked before Wudaopu because both share the `0x66 0x99` BLE
+    // manufacturer magic; the SSID-name check on iTiMO would lose otherwise.
+    val all: List<CameraVendor> = listOf(ItimoVendor, WudaopuVendor, JegoatVendor)
 
     /** Ask each registered vendor in order whether it recognizes this advert. */
     fun parseAdvert(
