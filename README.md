@@ -48,16 +48,17 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## Status
 
-| Feature                     | State |
-| --------------------------- | ----- |
-| BLE discovery               | ✅ multi-vendor |
-| Wi-Fi join                  | ✅ open or WPA2 |
-| Live video                  | ✅ MJPEG decoded in-app |
+| Feature                     | State                                   |
+| --------------------------- |-----------------------------------------|
+| BLE discovery               | ✅ multi-vendor                          |
+| Wi-Fi join                  | ✅ open or WPA2                          |
+| Live video                  | ✅ MJPEG decoded in-app                  |
 | Auto-rotate + circular mask | ✅ driven by camera accelerometer / gyro |
-| Horizontal-mirror toggle    | ✅ for self-examination |
-| Battery + model readout     | ✅ where the camera exposes it |
-| Photo / video capture       | not implemented yet |
-| Brightness (PWM) control    | not implemented yet |
+| Horizontal-mirror toggle    | ✅ for self-examination                  |
+| Screen stays awake          | ✅ during live stream                    |
+| Battery + model readout     | ✅ where the camera exposes it           |
+| Photo / video capture       | not implemented yet                     |
+| Brightness (PWM) control    | not implemented yet                     |
 
 ## License
 

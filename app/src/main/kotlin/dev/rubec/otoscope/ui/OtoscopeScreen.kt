@@ -42,9 +42,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -290,6 +292,15 @@ private fun StreamingView(
     val battery by state.battery.collectAsStateWithLifecycle()
     val diagnostics by state.diagnostics.collectAsStateWithLifecycle()
     val flipEnabled by state.flipEnabled.collectAsStateWithLifecycle()
+
+    // Prevent the screen from sleeping while a stream is on-screen. Scoped to
+    // the composable so it flips back off automatically when the user disconnects
+    // or navigates away — no lifecycle callbacks or wake-lock permission needed.
+    val view = LocalView.current
+    DisposableEffect(view) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
