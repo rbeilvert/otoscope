@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-07-10
+
+### Added
+- Support for the iTiMO family: cameras advertising as `iTiMO-XXXXXX` and paired with the "iTiMO" companion app (`com.molink.john.itimo`). Shares the Wudaopu wire format with the video/preview channel moved to UDP/8031.
+
 ## [0.4.0] — 2026-06-16
 
 ### Added

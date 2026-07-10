@@ -27,9 +27,12 @@ import kotlinx.coroutines.launch
 class WudaopuSession(
     cameraIp: String,
     network: Network?,
+    /** UDP port for the video/preview channel. Wudaopu / Xylla uses 8032;
+     *  the iTiMO variant uses 8031 with an otherwise-identical wire format. */
+    videoPort: Int = 8032,
 ) : CameraSession {
 
-    private val camera = WudaopuCameraClient(cameraIp = cameraIp, network = network)
+    private val camera = WudaopuCameraClient(cameraIp = cameraIp, network = network, cmdPort = videoPort)
     private val control = WudaopuControlClient(cameraIp = cameraIp, network = network)
 
     override val frames: SharedFlow<Bitmap> get() = camera.frames
