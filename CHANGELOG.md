@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-06-16
+
+### Added
+- Screen no longer sleeps while a stream is on-screen. The wake behaviour is scoped to the streaming view, so the device returns to its normal timeout as soon as you disconnect or navigate away. No permission requested, no background wake lock held.
+
 ## [0.3.0] — 2026-06-14
 
 ### Added

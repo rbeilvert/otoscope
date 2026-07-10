@@ -1,0 +1,1 @@
+Keeps the screen awake while you're streaming, so it doesn't turn off mid-exam. Scoped to the streaming view; the device goes back to its normal sleep timeout as soon as you disconnect.
