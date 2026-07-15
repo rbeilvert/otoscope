@@ -21,15 +21,15 @@ Otoscope is a reverse-engineered drop-in replacement for the proprietary compani
 
 The app supports three camera families. The hardware is identified by its BLE advertisement, and the right protocol is selected automatically.
 
-| Family | SSID prefix | Wi-Fi auth | Companion app | Status |
-| ------ | ----------- | ---------- | ------------- | ------ |
-| Wudaopu / Xylla | `Enjoy-XXXXXX`, `JesHome-XXXX` | open | "AIR-Look" (`com.air.airlook`) | working |
-| iTiMO | `iTiMO-XXXXXX` | open | "iTiMO" (`com.molink.john.itimo`) | working |
-| Shenzhen Jiding / JEGOAT | `softish-XXXXXX` | WPA2 | "EarVision" (`com.atomath.wifi_camera`) | working |
+| Family | SSID prefix | Wi-Fi auth | Companion app |
+| ------ | ----------- | ---------- | ------------- |
+| Wudaopu / Xylla | `Enjoy-XXXXXX`, `JesHome-XXXX` | open | "AIR-Look" (`com.air.airlook`) |
+| iTiMO | `iTiMO-XXXXXX` | open | "iTiMO" (`com.molink.john.itimo`) |
+| Shenzhen Jiding / JEGOAT | `softish-XXXXXX` | WPA2 | "EarVision" (`com.atomath.wifi_camera`) |
 
-If you have a Wi-Fi otoscope that pairs with one of those apps but isn't picked up by Otoscope,
-please file an issue including preferably the original companion application ID,
-a screenshot of the BLE advertisement (e.g. from nRF Connect) and any scan/connect logs from `adb logcat`.
+If you have a Wi-Fi otoscope that isn't picked up by Otoscope, please file an issue including preferably
+the original companion application ID, a screenshot of the BLE advertisement (e.g. from nRF Connect)
+and any scan/connect logs from `adb logcat`.
 
 ## Build
 
