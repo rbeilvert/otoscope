@@ -172,6 +172,7 @@ private fun ScanView(
         when (state) {
             is CameraState.Connecting -> ConnectingHeader(state.advert.ssid, state.attempt, state.totalAttempts)
             is CameraState.Error -> ErrorHeader(state.message)
+            is CameraState.Disconnected -> DisconnectedHeader(state.reason)
             else -> Unit
         }
 
@@ -277,6 +278,26 @@ private fun ErrorHeader(message: String) {
             .padding(12.dp)
     ) {
         Text(message, color = MaterialTheme.colorScheme.onErrorContainer)
+    }
+}
+
+@Composable
+private fun DisconnectedHeader(reason: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp)
+            .background(MaterialTheme.colorScheme.tertiaryContainer, RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Default.PowerOff,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+        )
+        Spacer(Modifier.size(12.dp))
+        Text(reason, color = MaterialTheme.colorScheme.onTertiaryContainer)
     }
 }
 
