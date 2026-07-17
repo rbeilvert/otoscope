@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] — 2026-07-17
+
+### Fixed
+- Turning the camera off mid-stream no longer crashes the app. Both the Wi-Fi network-lost callback and a stream-stall watchdog now trigger a graceful teardown that shows a brief "Camera disconnected" notice and returns to the home screen. The previously-discovered camera is also dropped from the list so it can't be tapped for a phantom reconnect.
+
 ## [0.5.0] — 2026-07-10
 
 ### Added

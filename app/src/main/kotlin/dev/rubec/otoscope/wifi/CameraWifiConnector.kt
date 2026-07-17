@@ -36,6 +36,11 @@ class CameraWifiConnector(context: Context) {
     private var current: ConnectivityManager.NetworkCallback? = null
     private var lastSuggestions: List<WifiNetworkSuggestion> = emptyList()
 
+    /** Fires when the bound camera network drops after a successful connect —
+     *  e.g. the user powered off the camera. Cleared automatically on
+     *  [disconnect]. Assigned by the ViewModel so it can react without polling. */
+    var onNetworkLost: (() -> Unit)? = null
+
     /** The bound camera network — non-null while connected. Hand its SocketFactory
      *  to any networking library so its sockets route through the camera AP
      *  instead of whatever Android picks as the default. */
@@ -96,6 +101,13 @@ class CameraWifiConnector(context: Context) {
 
             override fun onLost(network: Network) {
                 Log.w(TAG, "Lost WiFi ${advert.ssid}")
+                // Only trip the listener if we had already reported success — the
+                // suspendCancellableCoroutine hasn't resumed yet if we lose the
+                // network before onAvailable fires, and the connect() caller
+                // handles that path via onUnavailable / cancellation.
+                if (!cont.isActive && currentNetwork == network) {
+                    onNetworkLost?.invoke()
+                }
             }
         }
 
@@ -105,6 +117,9 @@ class CameraWifiConnector(context: Context) {
     }
 
     fun disconnect() {
+        // Clear the loss listener FIRST so a race where the network drops during
+        // our own teardown doesn't fire an unexpected-disconnect notification.
+        onNetworkLost = null
         current?.let {
             runCatching { cm.unregisterNetworkCallback(it) }
             current = null
@@ -113,7 +128,7 @@ class CameraWifiConnector(context: Context) {
             runCatching { wifi.removeNetworkSuggestions(lastSuggestions) }
             lastSuggestions = emptyList()
         }
-        cm.bindProcessToNetwork(null)
+        runCatching { cm.bindProcessToNetwork(null) }
         currentNetwork = null
         localIp = null
         gatewayIp = null

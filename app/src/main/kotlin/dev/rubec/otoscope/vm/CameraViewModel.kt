@@ -14,6 +14,7 @@ import dev.rubec.otoscope.stream.CameraSession
 import dev.rubec.otoscope.wifi.CameraWifiConnector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,7 +22,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed interface CameraState {
     data object Idle : CameraState
@@ -45,6 +48,10 @@ sealed interface CameraState {
         val flipEnabled: StateFlow<Boolean>,
     ) : CameraState
     data class Error(val message: String) : CameraState
+
+    /** Camera dropped mid-session (powered off, out of range). Shown briefly
+     *  then auto-transitions back to [Idle] — no user action required. */
+    data class Disconnected(val reason: String) : CameraState
 }
 
 class CameraViewModel(app: Application) : AndroidViewModel(app) {
@@ -60,6 +67,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     val adverts: StateFlow<List<CameraAdvert>> = _adverts.asStateFlow()
 
     private var scanJob: Job? = null
+    private var stallWatchdogJob: Job? = null
 
     /** Horizontal-mirror state for the active stream. Owned here so the UI
      *  reads it read-only and routes toggles back through [setFlipEnabled]. */
@@ -167,15 +175,89 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             diagnostics = session.diagnostics,
             flipEnabled = flipEnabled.asStateFlow(),
         )
+
+        // React to the camera's WiFi AP disappearing (typical when the user
+        // powers the camera off). Fires once — no double-teardown risk.
+        wifi.onNetworkLost = {
+            viewModelScope.launch {
+                handleUnexpectedDisconnect(reason = "Camera disconnected")
+            }
+        }
+
+        // Belt-and-braces stall watchdog: on some devices the WiFi callback
+        // takes 10s+ to fire (or never does) after the AP goes silent. Watch
+        // the packet counter — no forward progress for STALL_TIMEOUT_MS while
+        // we're supposedly streaming means the camera stopped.
+        stallWatchdogJob?.cancel()
+        stallWatchdogJob = viewModelScope.launch {
+            var lastPackets = -1L
+            var stalledSince: Long? = null
+            while (isActive && _state.value is CameraState.Streaming) {
+                delay(STALL_CHECK_INTERVAL_MS)
+                val packets = session.stats.value.packetsReceived
+                if (packets != lastPackets) {
+                    lastPackets = packets
+                    stalledSince = null
+                    continue
+                }
+                // No new packets since the last check.
+                val now = elapsedNow()
+                if (stalledSince == null) {
+                    stalledSince = now
+                } else if (now - stalledSince >= STALL_TIMEOUT_MS && lastPackets > 0) {
+                    // lastPackets > 0 gate — a brand-new session that hasn't
+                    // received its first packet yet shouldn't trip the watchdog,
+                    // the connect flow's own timeout owns that failure mode.
+                    Log.w(TAG, "stream stalled: ${(now - stalledSince) / 1000}s without packets")
+                    handleUnexpectedDisconnect(reason = "Camera stopped responding")
+                    return@launch
+                }
+            }
+        }
     }
+
+    /** Consolidate cleanup for both the network-loss callback and the stall
+     *  watchdog. Idempotent — safe to call from either signal path even if the
+     *  other has already fired. */
+    private suspend fun handleUnexpectedDisconnect(reason: String) {
+        val streaming = _state.value as? CameraState.Streaming ?: return
+        Log.i(TAG, "unexpected disconnect: $reason")
+        stallWatchdogJob?.cancel()
+        stallWatchdogJob = null
+
+        // Session close involves socket teardown that can throw when the
+        // underlying network is already gone — swallow, we're bailing anyway.
+        withContext(NonCancellable) {
+            runCatching { streaming.session.close() }
+            runCatching { wifi.disconnect() }
+        }
+
+        // Drop the previous scan result — the camera that just went dark is
+        // still in there, and its now-stale BSSID would show as a reconnectable
+        // entry until the user starts a fresh scan.
+        _adverts.value = emptyList()
+
+        _state.value = CameraState.Disconnected(reason)
+        delay(DISCONNECT_NOTICE_MS)
+        // Only clear the notice if the user hasn't already moved on (e.g.
+        // tapped a scan control) during the notice window.
+        if (_state.value is CameraState.Disconnected) {
+            _state.value = CameraState.Idle
+        }
+    }
+
+    /** Monotonic clock — [System.currentTimeMillis] is affected by NTP jumps. */
+    private fun elapsedNow(): Long = android.os.SystemClock.elapsedRealtime()
 
     fun setFlipEnabled(enabled: Boolean) {
         flipEnabled.value = enabled
     }
 
     fun disconnect() {
-        (state.value as? CameraState.Streaming)?.session?.close()
-        wifi.disconnect()
+        stallWatchdogJob?.cancel()
+        stallWatchdogJob = null
+        runCatching { (state.value as? CameraState.Streaming)?.session?.close() }
+        runCatching { wifi.disconnect() }
         _state.value = CameraState.Idle
     }
 
@@ -189,5 +271,10 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         private const val CONNECT_ATTEMPTS = 3
         private const val RETRY_BACKOFF_MS = 1_500L
         private const val POST_KNOCK_DELAY_MS = 500L
+        private const val STALL_CHECK_INTERVAL_MS = 1_000L
+        // Ample headroom over the video keepalive/packet cadence — real streams
+        // send tens of packets per second, so 5 s of silence is unambiguous.
+        private const val STALL_TIMEOUT_MS = 5_000L
+        private const val DISCONNECT_NOTICE_MS = 3_000L
     }
 }

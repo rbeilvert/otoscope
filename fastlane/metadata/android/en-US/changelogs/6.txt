@@ -1,0 +1,1 @@
+Fixes a crash when the camera is turned off mid-stream. The app now shows a brief "Camera disconnected" notice and returns to the home screen instead.
