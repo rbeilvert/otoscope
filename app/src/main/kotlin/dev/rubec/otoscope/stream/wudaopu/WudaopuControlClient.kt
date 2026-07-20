@@ -1,7 +1,7 @@
 package dev.rubec.otoscope.stream.wudaopu
 
 import android.net.Network
-import android.util.Log
+import dev.rubec.otoscope.debug.FileLog as Log
 import dev.rubec.otoscope.stream.BatteryStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex

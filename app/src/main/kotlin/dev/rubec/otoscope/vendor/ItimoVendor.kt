@@ -6,7 +6,7 @@ import dev.rubec.otoscope.stream.CameraSession
 import dev.rubec.otoscope.stream.wudaopu.WudaopuSession
 
 /**
- * Cameras advertising as `iTiMO-XXXXXX`.
+ * Cameras advertising as `iTiMO-XXXXXX` or `jetion_XXXX`.
  *
  * Sold under the "Smart Visual Ear Cleaner" brand, paired with the "iTiMO"
  * companion app (`com.molink.john.itimo`). The wire protocol is the same
@@ -15,15 +15,25 @@ import dev.rubec.otoscope.stream.wudaopu.WudaopuSession
  * channel, but the video/preview UDP port is `8031` instead of `8032`.
  * We reuse [WudaopuSession] with the port override.
  *
+ * The reference app scans Wi-Fi results for the `jetion_` prefix
+ * (`com.wifiview.config.WifiFunction`) alongside the newer `iTiMO-`
+ * branding, so both spellings identify the same hardware family; we
+ * accept either as long as the BLE manufacturer-data envelope matches.
+ *
  * Registered before [WudaopuVendor] so the SSID-name match wins on adverts
  * whose manufacturer data would otherwise be claimed by Wudaopu's magic check.
  */
 object ItimoVendor : CameraVendor {
     override val displayName = "iTiMO"
-    override val defaultCameraIp = "192.168.0.10"
+    // Hard-coded in the reference iTiMO app (`com.wifiview.nativelibs.CmdSocket`
+    // and `com.wifiview.config.WifiFunction`). Some devices don't run DHCP and
+    // rely on the phone assigning itself a static `192.168.10.X`; when that
+    // happens Android's `LinkProperties.routes` come back empty and this
+    // fallback is the only way we know where to send.
+    override val defaultCameraIp = "192.168.10.123"
 
     private const val VIDEO_PORT = 8031
-    private const val NAME_PREFIX = "iTiMO-"
+    private val NAME_PREFIXES = listOf("iTiMO-", "jetion_")
     private val MAGIC = byteArrayOf(0x66, 0x99.toByte())
 
     override fun parseAdvert(
@@ -32,7 +42,8 @@ object ItimoVendor : CameraVendor {
         scanRecord: ByteArray?,
         rssi: Int,
     ): CameraAdvert? {
-        if (deviceName.isNullOrBlank() || !deviceName.startsWith(NAME_PREFIX, ignoreCase = true)) return null
+        if (deviceName.isNullOrBlank()) return null
+        if (NAME_PREFIXES.none { deviceName.startsWith(it, ignoreCase = true) }) return null
         if (scanRecord == null) return null
         val payload = findManufacturerData(scanRecord, MAGIC) ?: return null
         if (payload.size < 6) return null

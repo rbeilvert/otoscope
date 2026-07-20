@@ -2,9 +2,10 @@ package dev.rubec.otoscope.stream.wudaopu
 
 import android.graphics.Bitmap
 import android.net.Network
-import android.util.Log
+import dev.rubec.otoscope.debug.FileLog as Log
 import dev.rubec.otoscope.stream.JpegDecoder
 import dev.rubec.otoscope.stream.SessionStats
+import dev.rubec.otoscope.stream.TerminalErrors
 import dev.rubec.otoscope.stream.toHex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +57,9 @@ internal class WudaopuCameraClient(
     private val _stats = MutableStateFlow(SessionStats())
     val stats: StateFlow<SessionStats> = _stats.asStateFlow()
 
+    private val _terminalError = MutableStateFlow<String?>(null)
+    val terminalError: StateFlow<String?> = _terminalError.asStateFlow()
+
     fun start() {
         if (runJob != null) return
         runJob = scope.launch {
@@ -70,16 +74,31 @@ internal class WudaopuCameraClient(
 
     private suspend fun runStream() {
         val sock = DatagramSocket().also { socket = it }
-        network?.bindSocket(sock)
+        val bindResult = runCatching { network?.bindSocket(sock) }
         sock.soTimeout = 1000
         sock.receiveBufferSize = 4 * 1024 * 1024
+        Log.i(
+            TAG,
+            "runStream: cameraIp=$cameraIp cmdPort=$cmdPort " +
+                "network=${network != null} bindSocket=${bindResult.isSuccess} localPort=${sock.localPort}",
+        )
+        // If we have a network handle but the OS refused the bind, our packets
+        // would silently route through some other interface (typically a VPN)
+        // and never reach the camera. Fail fast so the ViewModel can surface a
+        // specific, actionable message instead of the user waiting on frames.
+        if (network != null && bindResult.isFailure) {
+            Log.w(TAG, "bindSocket refused: ${bindResult.exceptionOrNull()?.message}")
+            _terminalError.value = TerminalErrors.NETWORK_BIND_FORBIDDEN
+            return
+        }
 
         val cameraAddr = InetAddress.getByName(cameraIp)
         val cmdAddr = InetSocketAddress(cameraAddr, cmdPort)
 
-        // Burst the start cmd 11x — UDP is lossy and the camera ignores the
+        // Burst the start cmd 11x. UDP is lossy and the camera ignores the
         // first few packets if the AP is still settling.
         sendCmd(sock, cmdAddr, CMD_START_PREVIEW, burst = 11)
+        Log.i(TAG, "start burst sent 11x → ${cameraAddr.hostAddress}:$cmdPort")
 
         val keepalive = scope.launch {
             while (isActive) {

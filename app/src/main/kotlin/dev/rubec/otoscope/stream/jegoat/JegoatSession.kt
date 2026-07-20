@@ -2,11 +2,12 @@ package dev.rubec.otoscope.stream.jegoat
 
 import android.graphics.Bitmap
 import android.net.Network
-import android.util.Log
+import dev.rubec.otoscope.debug.FileLog as Log
 import dev.rubec.otoscope.stream.BatteryStatus
 import dev.rubec.otoscope.stream.CameraSession
 import dev.rubec.otoscope.stream.JpegDecoder
 import dev.rubec.otoscope.stream.SessionStats
+import dev.rubec.otoscope.stream.TerminalErrors
 import dev.rubec.otoscope.stream.toHex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +66,9 @@ class JegoatSession(
     private val _diagnostics = MutableStateFlow<Map<String, String>>(emptyMap())
     override val diagnostics: StateFlow<Map<String, String>> = _diagnostics.asStateFlow()
 
+    private val _terminalError = MutableStateFlow<String?>(null)
+    override val terminalError: StateFlow<String?> = _terminalError.asStateFlow()
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var videoJob: Job? = null
     private var controlJob: Job? = null
@@ -105,12 +109,17 @@ class JegoatSession(
 
     private suspend fun runVideo() {
         val addr = cameraAddr ?: return
-        val sock = DatagramSocket().also { s ->
-            network?.bindSocket(s)
-            s.soTimeout = 1000
-            s.receiveBufferSize = 4 * 1024 * 1024
-        }
+        val sock = DatagramSocket()
+        val bindResult = runCatching { network?.bindSocket(sock) }
+        sock.soTimeout = 1000
+        sock.receiveBufferSize = 4 * 1024 * 1024
         videoSocket = sock
+        // Same failure mode as Wudaopu; see [WudaopuCameraClient.runStream].
+        if (network != null && bindResult.isFailure) {
+            Log.w(TAG, "bindSocket refused: ${bindResult.exceptionOrNull()?.message}")
+            _terminalError.value = TerminalErrors.NETWORK_BIND_FORBIDDEN
+            return
+        }
 
         // Initial start cmd burst. The camera replies to whichever source port
         // the burst came from, so this socket has to send AND receive.

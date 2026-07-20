@@ -10,7 +10,7 @@ import android.net.NetworkRequest
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.net.wifi.WifiNetworkSuggestion
-import android.util.Log
+import dev.rubec.otoscope.debug.FileLog as Log
 import dev.rubec.otoscope.ble.CameraAdvert
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.net.Inet4Address
@@ -51,7 +51,7 @@ class CameraWifiConnector(context: Context) {
     var localIp: String? = null
         private set
 
-    /** Best guess at the camera's IPv4 address — defaults to the network gateway,
+    /** Best guess at the camera's IPv4 address. Defaults to the network gateway,
      *  which on these cheap APs is the camera itself. */
     var gatewayIp: String? = null
         private set
@@ -101,7 +101,7 @@ class CameraWifiConnector(context: Context) {
 
             override fun onLost(network: Network) {
                 Log.w(TAG, "Lost WiFi ${advert.ssid}")
-                // Only trip the listener if we had already reported success — the
+                // Only trip the listener if we had already reported success. The
                 // suspendCancellableCoroutine hasn't resumed yet if we lose the
                 // network before onAvailable fires, and the connect() caller
                 // handles that path via onUnavailable / cancellation.

@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] — 2026-07-23
+
+### Fixed
+- Active VPNs on the phone used to leave the app stuck on "Waiting for frames". The app now detects the refused socket bind and shows a clear error asking the user to disable their VPN and try again. A general "no video received" safety net also kicks in if packets never arrive for any other reason.
+
 ## [0.5.1] — 2026-07-17
 
 ### Fixed

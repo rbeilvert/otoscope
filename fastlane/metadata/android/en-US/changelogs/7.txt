@@ -1,0 +1,1 @@
+Fixes the app hanging on "Waiting for frames" when a VPN is active on the phone. A clear message now asks the user to disable their VPN.

@@ -24,7 +24,7 @@ The app supports three camera families. The hardware is identified by its BLE ad
 | Family | SSID prefix | Wi-Fi auth | Companion app |
 | ------ | ----------- | ---------- | ------------- |
 | Wudaopu / Xylla | `Enjoy-XXXXXX`, `JesHome-XXXX` | open | "AIR-Look" (`com.air.airlook`) |
-| iTiMO | `iTiMO-XXXXXX` | open | "iTiMO" (`com.molink.john.itimo`) |
+| iTiMO | `iTiMO-XXXXXX`, `jetion_XXXX` | open | "iTiMO" (`com.molink.john.itimo`) |
 | Shenzhen Jiding / JEGOAT | `softish-XXXXXX` | WPA2 | "EarVision" (`com.atomath.wifi_camera`) |
 
 If you have a Wi-Fi otoscope that isn't picked up by Otoscope, please file an issue including preferably

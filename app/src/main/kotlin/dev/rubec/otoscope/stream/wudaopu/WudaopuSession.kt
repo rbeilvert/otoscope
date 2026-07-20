@@ -38,6 +38,7 @@ class WudaopuSession(
     override val frames: SharedFlow<Bitmap> get() = camera.frames
     override val rotation: StateFlow<Float> get() = camera.rotation
     override val stats: StateFlow<SessionStats> get() = camera.stats
+    override val terminalError: StateFlow<String?> get() = camera.terminalError
 
     private val _battery = MutableStateFlow<BatteryStatus?>(null)
     override val battery: StateFlow<BatteryStatus?> = _battery.asStateFlow()

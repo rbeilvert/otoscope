@@ -4,13 +4,14 @@ import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.wifi.WifiManager
-import android.util.Log
+import dev.rubec.otoscope.debug.FileLog as Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.rubec.otoscope.ble.CameraAdvert
 import dev.rubec.otoscope.ble.CameraBleScanner
 import dev.rubec.otoscope.stream.BatteryStatus
 import dev.rubec.otoscope.stream.CameraSession
+import dev.rubec.otoscope.stream.TerminalErrors
 import dev.rubec.otoscope.wifi.CameraWifiConnector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -184,36 +185,82 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
 
-        // Belt-and-braces stall watchdog: on some devices the WiFi callback
-        // takes 10s+ to fire (or never does) after the AP goes silent. Watch
-        // the packet counter — no forward progress for STALL_TIMEOUT_MS while
-        // we're supposedly streaming means the camera stopped.
+        // Watch the session for terminal errors; conditions we know can't
+        // recover on their own (e.g. the OS refusing to bind our sockets to the
+        // camera's Wi-Fi because another app is holding a VPN with lockdown).
+        // Route these to a specific error message so the user sees what to do.
+        viewModelScope.launch {
+            session.terminalError.collect { code ->
+                if (code == null || _state.value !is CameraState.Streaming) return@collect
+                Log.w(TAG, "terminal error from session: $code")
+                surfaceTerminalError(code)
+            }
+        }
+
+        // Two-mode watchdog:
+        //  - FIRST-PACKET timeout. If we never receive a single video packet
+        //    within FIRST_PACKET_TIMEOUT_MS after start, the camera can't reach
+        //    us. Usually a VPN routing packets away from the camera Wi-Fi even
+        //    though our bind succeeded (kernel accepts the source-IP bind but
+        //    Android's egress rules still drop the traffic). Surface a specific
+        //    terminal error so the user sees actionable copy instead of a stuck
+        //    "Waiting for frames".
+        //  - STEADY-STATE stall. Packets stopped after some had arrived. That's
+        //    a mid-session disconnect (camera powered off, out of range, ...).
         stallWatchdogJob?.cancel()
         stallWatchdogJob = viewModelScope.launch {
-            var lastPackets = -1L
+            val startedAt = elapsedNow()
+            var lastPackets = 0L
             var stalledSince: Long? = null
             while (isActive && _state.value is CameraState.Streaming) {
                 delay(STALL_CHECK_INTERVAL_MS)
                 val packets = session.stats.value.packetsReceived
+                val now = elapsedNow()
+
+                if (packets == 0L) {
+                    // Still haven't heard from the camera.
+                    if (now - startedAt >= FIRST_PACKET_TIMEOUT_MS) {
+                        Log.w(TAG, "no first packet after ${(now - startedAt) / 1000}s")
+                        surfaceTerminalError(TerminalErrors.CAMERA_UNREACHABLE)
+                        return@launch
+                    }
+                    continue
+                }
+
                 if (packets != lastPackets) {
                     lastPackets = packets
                     stalledSince = null
                     continue
                 }
-                // No new packets since the last check.
-                val now = elapsedNow()
+                // Had packets, then they stopped.
                 if (stalledSince == null) {
                     stalledSince = now
-                } else if (now - stalledSince >= STALL_TIMEOUT_MS && lastPackets > 0) {
-                    // lastPackets > 0 gate — a brand-new session that hasn't
-                    // received its first packet yet shouldn't trip the watchdog,
-                    // the connect flow's own timeout owns that failure mode.
+                } else if (now - stalledSince >= STALL_TIMEOUT_MS) {
                     Log.w(TAG, "stream stalled: ${(now - stalledSince) / 1000}s without packets")
                     handleUnexpectedDisconnect(reason = "Camera stopped responding")
                     return@launch
                 }
             }
         }
+    }
+
+    /** Map a machine-readable [TerminalErrors] code to a user-facing message,
+     *  tear the session down, and land in [CameraState.Error] so the message
+     *  stays visible until the user acknowledges it. */
+    private fun surfaceTerminalError(code: String) {
+        val streaming = _state.value as? CameraState.Streaming ?: return
+        stallWatchdogJob?.cancel()
+        stallWatchdogJob = null
+        runCatching { streaming.session.close() }
+        runCatching { wifi.disconnect() }
+        val message = when (code) {
+            TerminalErrors.NETWORK_BIND_FORBIDDEN,
+            TerminalErrors.CAMERA_UNREACHABLE ->
+                "Couldn't reach the camera over Wi-Fi. " +
+                    "If you have an active VPN, disable it and try connecting again."
+            else -> "Camera session failed ($code)"
+        }
+        _state.value = CameraState.Error(message)
     }
 
     /** Consolidate cleanup for both the network-loss callback and the stall
@@ -275,6 +322,11 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         // Ample headroom over the video keepalive/packet cadence — real streams
         // send tens of packets per second, so 5 s of silence is unambiguous.
         private const val STALL_TIMEOUT_MS = 5_000L
+        // Grace window from session start to the first video packet. Wudaopu's
+        // start-cmd burst + camera boot handshake normally lands the first frame
+        // within ~1 s; 15 s is well past that but may be shorter than a user's
+        // patience with a stuck "Waiting for frames" screen.
+        private const val FIRST_PACKET_TIMEOUT_MS = 10_000L
         private const val DISCONNECT_NOTICE_MS = 3_000L
     }
 }
