@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.rubec.otoscope.debug.FileLog
 import dev.rubec.otoscope.ui.OtoscopeScreen
 import dev.rubec.otoscope.ui.theme.OtoscopeTheme
 import dev.rubec.otoscope.vm.CameraViewModel
@@ -30,6 +31,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Debug builds only. Collects a per-run log at
+        // /sdcard/Android/data/dev.rubec.otoscope.debug/files/otoscope-debug.log
+        if (BuildConfig.DEBUG) FileLog.init(applicationContext)
         setContent {
             val vm: CameraViewModel = viewModel()
             val state by vm.state.collectAsStateWithLifecycle()
@@ -48,7 +52,7 @@ class MainActivity : ComponentActivity() {
             }
 
             // The Wi-Fi settings panel doesn't report a result code, so just
-            // re-scan when the user returns — startScan() re-checks Wi-Fi state.
+            // re-scan when the user returns. startScan() re-checks Wi-Fi state.
             val enableWifiLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.StartActivityForResult()
             ) { vm.startScan() }

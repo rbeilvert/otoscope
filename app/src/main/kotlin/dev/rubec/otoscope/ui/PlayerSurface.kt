@@ -26,7 +26,7 @@ import androidx.compose.ui.layout.ContentScale
  *    deliver a left/right-flipped image.
  *  - **Rotation**. The camera's on-board accelerometer feeds [rotationDegrees].
  *    When [flipEnabled] is true, we negate the rotation because the horizontal
- *    flip reverses the visual sense of rotation — without the negation a
+ *    flip reverses the visual sense of rotation. Without the negation a
  *    clockwise hand motion would look counter-clockwise on screen.
  */
 @Composable

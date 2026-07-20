@@ -15,8 +15,8 @@ data class CameraAdvert(
      *  Null = the AP is open. */
     val wpa2Passphrase: String?,
     /** BLE MAC of the advertising device. Some vendors need a GATT exchange on
-     *  this address before the camera enables its WiFi AP — see
-     *  [CameraVendor.preWifiHandshake]. */
+     *  this address before the camera enables its WiFi AP.
+     *  See [CameraVendor.preWifiHandshake]. */
     val bleAddress: String,
     val rssi: Int,
 )
