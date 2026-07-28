@@ -37,7 +37,7 @@ Requires Android Studio Ladybug+ or a CLI Android SDK with API 35 + JDK 17.
 
 ```bash
 # Bootstrap the Gradle wrapper once. If you have any modern Gradle:
-gradle wrapper --gradle-version 8.10.2 --distribution-type bin
+gradle wrapper --gradle-version 9.6.1 --distribution-type bin
 
 # Debug build (no signing required):
 ./gradlew assembleDebug
