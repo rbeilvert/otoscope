@@ -310,7 +310,6 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         disconnect()
-        super.onCleared()
     }
 
     companion object {
@@ -324,7 +323,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         private const val STALL_TIMEOUT_MS = 5_000L
         // Grace window from session start to the first video packet. Wudaopu's
         // start-cmd burst + camera boot handshake normally lands the first frame
-        // within ~1 s; 15 s is well past that but may be shorter than a user's
+        // within ~1 s; 10 s is well past that but still shorter than a user's
         // patience with a stuck "Waiting for frames" screen.
         private const val FIRST_PACKET_TIMEOUT_MS = 10_000L
         private const val DISCONNECT_NOTICE_MS = 3_000L

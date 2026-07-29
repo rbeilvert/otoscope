@@ -19,14 +19,14 @@ val hasReleaseKeystore = keystoreProperties.containsKey("storeFile")
 
 android {
     namespace = "dev.rubec.otoscope"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.rubec.otoscope"
         minSdk = 29
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.5.2"
+        versionCode = 8
+        versionName = "0.5.3"
 
         vectorDrawables { useSupportLibrary = true }
     }
@@ -55,10 +55,6 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
         }
-    }
-
-    sourceSets {
-        getByName("main").java.srcDirs("src/main/kotlin")
     }
 
     compileOptions {

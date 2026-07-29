@@ -33,7 +33,7 @@ and any scan/connect logs from `adb logcat`.
 
 ## Build
 
-Requires Android Studio Ladybug+ or a CLI Android SDK with API 35 + JDK 17.
+Requires Android Studio Ladybug+ or a CLI Android SDK with API 37 + JDK 17.
 
 ```bash
 # Bootstrap the Gradle wrapper once. If you have any modern Gradle:

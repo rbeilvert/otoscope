@@ -4,10 +4,21 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] — 2026-07-29
+
+### Changed
+- Build toolchain moved to Gradle 9.6.1, Android Gradle Plugin 9.3.1, and Kotlin 2.4.10, and the app now compiles against SDK 37. `targetSdk` stays at 35.
+- Dependencies refreshed: Compose BOM 2026.06.01, `core-ktx` 1.19.0, Lifecycle 2.11.0, `activity-compose` 1.13.0, coroutines 1.11.0.
+- The launcher icon now ships a monochrome layer, so it follows the system theme on launchers that support themed icons.
+
 ## [0.5.2] — 2026-07-23
+
+### Added
+- iTiMO cameras that advertise as `jetion_XXXX` are now recognised alongside the `iTiMO-XXXXXX` naming. Both spellings are the same hardware family, sold under different branding.
 
 ### Fixed
 - Active VPNs on the phone used to leave the app stuck on "Waiting for frames". The app now detects the refused socket bind and shows a clear error asking the user to disable their VPN and try again. A general "no video received" safety net also kicks in if packets never arrive for any other reason.
+- iTiMO cameras that don't run a DHCP server were unreachable. The fallback camera address is now the vendor's own app hard-coded `192.168.10.123`.
 
 ## [0.5.1] — 2026-07-17
 

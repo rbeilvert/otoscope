@@ -2,4 +2,7 @@
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <!-- The foreground is already a flat white silhouette on transparent, which
+         is what the themed-icon layer wants: the launcher recolours it. -->
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>
