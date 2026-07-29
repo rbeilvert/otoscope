@@ -1,12 +1,15 @@
 package dev.rubec.otoscope.ble
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import androidx.annotation.RequiresPermission
 import dev.rubec.otoscope.debug.FileLog as Log
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
@@ -65,7 +68,6 @@ internal object BleKnock {
                 servicesReady.complete(status == BluetoothGatt.GATT_SUCCESS)
             }
 
-            @Suppress("DEPRECATION")
             override fun onCharacteristicRead(
                 g: BluetoothGatt,
                 characteristic: BluetoothGattCharacteristic,
@@ -96,20 +98,21 @@ internal object BleKnock {
 
         return try {
             withTimeout(timeoutMs) {
-                gatt = device.connectGatt(context, /* autoConnect = */ false, callback)
+                val conn = connect(context, device, callback)
                     ?: throw IllegalStateException("connectGatt returned null")
+                gatt = conn
 
                 val isConnected = connected.await()
                 if (!isConnected) return@withTimeout null
 
-                if (!gatt!!.discoverServices()) {
+                if (!conn.discoverServices()) {
                     Log.w(TAG, "discoverServices returned false")
                     return@withTimeout null
                 }
                 val servicesOk = servicesReady.await()
                 if (!servicesOk) return@withTimeout null
 
-                val service = gatt!!.getService(serviceUuid)
+                val service = conn.getService(serviceUuid)
                 if (service == null) {
                     Log.w(TAG, "service $serviceUuid not found")
                     return@withTimeout null
@@ -119,7 +122,7 @@ internal object BleKnock {
                     Log.w(TAG, "characteristic $characteristicUuid not found")
                     return@withTimeout null
                 }
-                if (!gatt!!.readCharacteristic(char)) {
+                if (!conn.readCharacteristic(char)) {
                     Log.w(TAG, "readCharacteristic returned false")
                     return@withTimeout null
                 }
@@ -138,4 +141,11 @@ internal object BleKnock {
             }
         }
     }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun connect(
+        context: Context,
+        device: BluetoothDevice,
+        callback: BluetoothGattCallback,
+    ): BluetoothGatt? = device.connectGatt(context, /* autoConnect = */ false, callback)
 }

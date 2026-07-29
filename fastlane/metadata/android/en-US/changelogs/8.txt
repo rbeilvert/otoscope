@@ -1,0 +1,1 @@
+Maintenance release. Refreshes the build toolchain and libraries. The launcher icon now follows the system theme on launchers that support themed icons, and the app no longer asks Android for blanket permission to send cleartext traffic.

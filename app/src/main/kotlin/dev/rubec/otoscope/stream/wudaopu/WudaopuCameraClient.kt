@@ -189,8 +189,10 @@ internal class WudaopuCameraClient(
 
     companion object {
         private const val TAG = "WudaopuClient"
+
+        // Preview-channel opcodes, from the AIR-Look teardown.
         private const val CMD_START_PREVIEW = 1
-        @Suppress("unused")
+        @Suppress("unused") // Kept as protocol documentation. We never send it.
         private const val CMD_STOP_PREVIEW = 2
     }
 }

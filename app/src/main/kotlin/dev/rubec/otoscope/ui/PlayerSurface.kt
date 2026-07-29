@@ -32,9 +32,9 @@ import androidx.compose.ui.layout.ContentScale
 @Composable
 fun CameraFrame(
     frame: Bitmap?,
+    modifier: Modifier = Modifier,
     rotationDegrees: Float = 0f,
     flipEnabled: Boolean = true,
-    modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier

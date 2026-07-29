@@ -56,7 +56,7 @@ object TerminalErrors {
     const val NETWORK_BIND_FORBIDDEN = "network_bind_forbidden"
 
     /** Socket setup succeeded but no video frames arrive within a reasonable
-     *  window (~15 s). This happens when an active VPN routes outbound traffic
+     *  window (~10 s). This happens when an active VPN routes outbound traffic
      *  away from the camera Wi-Fi even though our bind attempt succeeded.
      *  The kernel accepts the source-IP bind but Android's egress filtering still
      *  drops the packets. Detected by the ViewModel's first-packet watchdog. */
