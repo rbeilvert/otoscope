@@ -1,10 +1,10 @@
-package dev.rubec.otoscope.stream.wudaopu
+package dev.rubec.otoscope.stream.xylla
 
 import kotlin.math.atan
 import kotlin.math.sqrt
 
 /**
- * Translates the Wudaopu camera's packed accelerometer reading (3×10 bits
+ * Translates the Xylla camera's packed accelerometer reading (3×10 bits
  * carried at offset 16 of each video chunk) into a rotation angle in degrees.
  *
  * Jitter-suppression: only update the angle once the camera has actually

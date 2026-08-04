@@ -4,6 +4,18 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-08-04
+
+### Added
+- Support for **EarFairy** otoscopes (tested with model _Y-201_). These devices have no BLE component. The app scans nearby Wi-Fi and lists any `Cooleer_XXXXXX` access point so you can join with a single tap.
+- Live video for EarFairy via RTSP with a self-contained MJPEG-over-RTP (RFC 2435) depacketiser. No FFmpeg, no native code.
+- Ring-light on/off toggle for EarFairy, in addition with features already supported by other brands.
+- **Home screen model picker**. Two cards (Bluetooth pairing for Xylla / iTiMO / JEGOAT, Wi-Fi scan for EarFairy) list every supported model up-front so you can pick your discovery path easily. Permission prompts are also gated behind this choice: users on Wi-Fi-only hardware don't get asked for Bluetooth permission.
+
+### Changed
+- Renamed the "Wudaopu / Xylla" family to "Xylla" and "JEGOAT / EarVision" to "JEGOAT" throughout the app UI and code.
+
+
 ## [0.5.3] — 2026-07-29
 
 ### Changed

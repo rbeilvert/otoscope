@@ -6,7 +6,7 @@ package dev.rubec.otoscope.vendor
  * [prefix]. Returns the payload bytes AFTER the prefix, or null if no such record
  * is present.
  *
- * Both Wudaopu (`0x66 0x99`) and JEGOAT (`0x0F 0x27` = company ID 0x270F LE) use
+ * Both Xylla (`0x66 0x99`) and JEGOAT (`0x0F 0x27` = company ID 0x270F LE) use
  * the same envelope; they only differ in the prefix and the bytes after it.
  */
 internal fun findManufacturerData(record: ByteArray, prefix: ByteArray): ByteArray? {

@@ -9,7 +9,7 @@ import org.json.JSONObject
  * value combinations, units — so we don't try to abstract the whole thing.
  * What IS shared is the "turn a telemetry JSON blob into a tidy ordered map"
  * step, since vendors that just want to surface whatever the firmware reports
- * (like Wudaopu) shouldn't have to reimplement the JSON walk.
+ * (like Xylla) shouldn't have to reimplement the JSON walk.
  */
 internal object Diagnostics {
 

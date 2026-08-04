@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * A live, vendor-agnostic connection to one camera.
  *
- * The vendor-specific wire format lives in the implementation (`wudaopu/`,
+ * The vendor-specific wire format lives in the implementation (`xylla/`,
  * `jegoat/`, ...). Everything visible above this interface is generic.
  * The ViewModel and UI never have to switch on which hardware is connected.
  *
@@ -44,8 +44,26 @@ interface CameraSession {
      *  to a user-facing message and tears the session down. */
     val terminalError: StateFlow<String?>
 
+    /** Optional camera-side ring-light control. Non-null only for vendors that
+     *  expose a controllable LED over their control channel. The UI reveals
+     *  a toggle whenever this is set. */
+    val led: LedControl? get() = null
+
     fun start()
     fun close()
+}
+
+/** Ring-light control exposed by a [CameraSession]. Vendors that don't
+ *  support toggling the LED simply leave [CameraSession.led] null. */
+interface LedControl {
+    /** Latest observed state. Starts null before the camera has confirmed. */
+    val enabled: StateFlow<Boolean>
+
+    /** Fire-and-forget; the camera may take a moment to react. The UI reflects
+     *  the local state immediately for responsiveness, then reconciles with
+     *  [enabled] once the camera acknowledges (typically via its telemetry
+     *  stream). */
+    fun setEnabled(on: Boolean)
 }
 
 /** Well-known values for [CameraSession.terminalError]. */

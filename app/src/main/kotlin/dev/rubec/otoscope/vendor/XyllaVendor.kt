@@ -1,9 +1,10 @@
 package dev.rubec.otoscope.vendor
 
+import android.content.Context
 import android.net.Network
 import dev.rubec.otoscope.ble.CameraAdvert
 import dev.rubec.otoscope.stream.CameraSession
-import dev.rubec.otoscope.stream.wudaopu.WudaopuSession
+import dev.rubec.otoscope.stream.xylla.XyllaSession
 
 /**
  * Cameras advertising as `Enjoy-XXXXXX`, `JesHome-XXXX`, and similar.
@@ -13,8 +14,9 @@ import dev.rubec.otoscope.stream.wudaopu.WudaopuSession
  * followed by a 6-byte WiFi BSSID. SSID is the BLE device name. The AP is
  * open (no passphrase) and always advertised; no BLE GATT handshake required.
  */
-object WudaopuVendor : CameraVendor {
-    override val displayName = "Wudaopu"
+object XyllaVendor : CameraVendor {
+    override val displayName = "Xylla"
+    override val discoveryMode = DiscoveryMode.BLE
     override val defaultCameraIp = "192.168.0.10"
 
     private val MANUFACTURER_DATA_PREFIX = byteArrayOf(0x66, 0x99.toByte())
@@ -39,6 +41,6 @@ object WudaopuVendor : CameraVendor {
         )
     }
 
-    override fun createSession(network: Network?, cameraIp: String): CameraSession =
-        WudaopuSession(cameraIp = cameraIp, network = network)
+    override fun createSession(context: Context, network: Network?, cameraIp: String): CameraSession =
+        XyllaSession(cameraIp = cameraIp, network = network)
 }

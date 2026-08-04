@@ -12,7 +12,9 @@ import dev.rubec.otoscope.ble.CameraBleScanner
 import dev.rubec.otoscope.stream.BatteryStatus
 import dev.rubec.otoscope.stream.CameraSession
 import dev.rubec.otoscope.stream.TerminalErrors
+import dev.rubec.otoscope.vendor.DiscoveryMode
 import dev.rubec.otoscope.wifi.CameraWifiConnector
+import dev.rubec.otoscope.wifi.CameraWifiScanner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -31,7 +33,7 @@ sealed interface CameraState {
     data object Idle : CameraState
     data object BluetoothOff : CameraState
     data object WifiOff : CameraState
-    data object Scanning : CameraState
+    data class Scanning(val mode: DiscoveryMode) : CameraState
     data class Found(val advert: CameraAdvert) : CameraState
     data class Connecting(
         val advert: CameraAdvert,
@@ -57,7 +59,8 @@ sealed interface CameraState {
 
 class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val scanner = CameraBleScanner(app)
+    private val bleScanner = CameraBleScanner(app)
+    private val wifiScanner = CameraWifiScanner(app)
     private val wifi = CameraWifiConnector(app)
     private val wifiManager = app.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
@@ -74,8 +77,9 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
      *  reads it read-only and routes toggles back through [setFlipEnabled]. */
     private val flipEnabled = MutableStateFlow(true)
 
-    fun startScan() {
-        if (!scanner.isBluetoothEnabled) {
+    fun startScan(mode: DiscoveryMode) {
+        // Both modes need Wi-Fi enabled; BLE additionally needs Bluetooth on.
+        if (mode == DiscoveryMode.BLE && !bleScanner.isBluetoothEnabled) {
             _state.value = CameraState.BluetoothOff
             return
         }
@@ -85,10 +89,14 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         }
         scanJob?.cancel()
         _adverts.value = emptyList()
-        _state.value = CameraState.Scanning
+        _state.value = CameraState.Scanning(mode)
+        val source = when (mode) {
+            DiscoveryMode.BLE -> bleScanner.scan()
+            DiscoveryMode.WIFI_SCAN -> wifiScanner.scan()
+        }
         scanJob = viewModelScope.launch {
             try {
-                scanner.scan().collect { advert ->
+                source.collect { advert ->
                     _adverts.update { current ->
                         if (current.any { it.bssid == advert.bssid }) current
                         else current + advert
@@ -108,7 +116,12 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     fun stopScan() {
         scanJob?.cancel()
         scanJob = null
-        if (_state.value is CameraState.Scanning || _state.value is CameraState.Found) {
+        // Any non-active state resets to Idle. Called by the top-bar Stop
+        // button and by the radio-enable launchers in MainActivity so that
+        // enabling Bluetooth or Wi-Fi lands the user back on the picker
+        // rather than on the stale "radio is off" banner.
+        val cur = _state.value
+        if (cur !is CameraState.Streaming && cur !is CameraState.Connecting) {
             _state.value = CameraState.Idle
         }
     }
@@ -117,6 +130,17 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         stopScan()
         _state.value = CameraState.Connecting(advert, attempt = 1, totalAttempts = CONNECT_ATTEMPTS)
         viewModelScope.launch {
+            // Fast path for Wi-Fi-scan vendors when the user is already joined
+            // to the camera network via Android settings. No specifier prompt,
+            // no join-retry loop; we just adopt the active Network handle.
+            if (advert.vendor.discoveryMode == DiscoveryMode.WIFI_SCAN &&
+                wifi.adoptCurrentIfMatches(advert) != null
+            ) {
+                Log.i(TAG, "connect: adopted existing connection to ${advert.ssid}")
+                startStreaming(advert)
+                return@launch
+            }
+
             // Pairing is occasionally flaky on the first try — the BLE knock can
             // return before the camera's AP is fully advertised, or the
             // WifiNetworkSpecifier request can time out on a slow boot. Retry
@@ -159,7 +183,11 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         val cameraIp = wifi.gatewayIp ?: advert.vendor.defaultCameraIp
         Log.i(TAG, "starting ${advert.vendor.displayName} session on $cameraIp (local=${wifi.localIp})")
 
-        val session = advert.vendor.createSession(network = wifi.currentNetwork, cameraIp = cameraIp)
+        val session = advert.vendor.createSession(
+            context = getApplication(),
+            network = wifi.currentNetwork,
+            cameraIp = cameraIp,
+        )
         flipEnabled.value = true
         session.start()
 
@@ -254,10 +282,19 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { streaming.session.close() }
         runCatching { wifi.disconnect() }
         val message = when (code) {
-            TerminalErrors.NETWORK_BIND_FORBIDDEN,
-            TerminalErrors.CAMERA_UNREACHABLE ->
+            TerminalErrors.NETWORK_BIND_FORBIDDEN ->
+                // Hard-known VPN case: the OS refused our socket bind. Point
+                // the user straight at that.
                 "Couldn't reach the camera over Wi-Fi. " +
-                    "If you have an active VPN, disable it and try connecting again."
+                    "An active VPN is blocking access to the camera network. " +
+                    "Disable it and try again."
+            TerminalErrors.CAMERA_UNREACHABLE ->
+                // Softer copy: could be a stall, an RTSP failure, a broken
+                // camera, or a VPN. Suggest the VPN only as one possibility
+                // rather than the certain cause.
+                "The camera didn't answer. Check that it's powered on, then " +
+                    "try again. A VPN or another app tunnelling network " +
+                    "traffic can also block the stream."
             else -> "Camera session failed ($code)"
         }
         _state.value = CameraState.Error(message)
@@ -321,7 +358,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         // Ample headroom over the video keepalive/packet cadence — real streams
         // send tens of packets per second, so 5 s of silence is unambiguous.
         private const val STALL_TIMEOUT_MS = 5_000L
-        // Grace window from session start to the first video packet. Wudaopu's
+        // Grace window from session start to the first video packet. Xylla's
         // start-cmd burst + camera boot handshake normally lands the first frame
         // within ~1 s; 10 s is well past that but still shorter than a user's
         // patience with a stuck "Waiting for frames" screen.

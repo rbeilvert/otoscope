@@ -7,9 +7,11 @@ import android.net.MacAddress
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.net.wifi.WifiNetworkSuggestion
+import android.os.Build
 import dev.rubec.otoscope.debug.FileLog as Log
 import dev.rubec.otoscope.ble.CameraAdvert
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -56,6 +58,38 @@ class CameraWifiConnector(context: Context) {
     var gatewayIp: String? = null
         private set
 
+    /** Fast-path adopt: if the user is already joined to the camera Wi-Fi
+     *  (typical for EarFairy where discovery mirrors the currently-connected
+     *  SSID), grab that [Network] instead of firing a fresh
+     *  [WifiNetworkSpecifier] request that would re-prompt.
+     *
+     *  Iterates every Wi-Fi-transport network the OS knows about, not just
+     *  `activeNetwork` — camera APs have no internet and Android tends to
+     *  leave them off the default route.
+     *
+     *  Returns the adopted [Network] on success, or null if none matches. */
+    fun adoptCurrentIfMatches(advert: CameraAdvert): Network? {
+        for (net in cm.allNetworks) {
+            val caps = cm.getNetworkCapabilities(net) ?: continue
+            if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) continue
+            val info = caps.transportInfo as? WifiInfo ?: continue
+            val ssid = info.currentSsid() ?: continue
+            if (!ssid.equals(advert.ssid, ignoreCase = true)) continue
+
+            Log.i(TAG, "adoptCurrent: matched ${advert.ssid}")
+            cm.bindProcessToNetwork(net)
+            currentNetwork = net
+            captureDiagnostics(net)
+            return net
+        }
+        return null
+    }
+
+    @Suppress("DEPRECATION")
+    private fun WifiInfo.currentSsid(): String? =
+        // getWifiSsid() (API 33+) is @SystemApi; use the still-public getSSID().
+        ssid?.trim('"')?.takeUnless { it.isBlank() || it == "<unknown ssid>" }
+
     @SuppressLint("MissingPermission")
     suspend fun connect(advert: CameraAdvert): Network = suspendCancellableCoroutine { cont ->
         // 1. File a suggestion. This lets some launchers pop an inline notification
@@ -71,7 +105,7 @@ class CameraWifiConnector(context: Context) {
         }.onFailure { Log.w(TAG, "Suggestion failed: ${it.message}") }
 
         // 2. File the specifier request. This is what actually establishes the
-        //    bound network we'll send UDP through. Wudaopu APs are open; JEGOAT
+        //    bound network we'll send UDP through. Xylla APs are open; JEGOAT
         //    is WPA2 with a per-camera passphrase carried in the BLE advert.
         val specifier = WifiNetworkSpecifier.Builder()
             .setSsid(advert.ssid)

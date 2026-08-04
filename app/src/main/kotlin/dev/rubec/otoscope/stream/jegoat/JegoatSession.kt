@@ -7,7 +7,7 @@ import dev.rubec.otoscope.stream.BatteryStatus
 import dev.rubec.otoscope.stream.CameraSession
 import dev.rubec.otoscope.stream.JpegDecoder
 import dev.rubec.otoscope.stream.SessionStats
-import dev.rubec.otoscope.stream.TerminalErrors
+import dev.rubec.otoscope.stream.bindOrTerminal
 import dev.rubec.otoscope.stream.toHex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -110,16 +110,14 @@ class JegoatSession(
     private suspend fun runVideo() {
         val addr = cameraAddr ?: return
         val sock = DatagramSocket()
-        val bindResult = runCatching { network?.bindSocket(sock) }
-        sock.soTimeout = 1000
-        sock.receiveBufferSize = 4 * 1024 * 1024
         videoSocket = sock
-        // Same failure mode as Wudaopu; see [WudaopuCameraClient.runStream].
-        if (network != null && bindResult.isFailure) {
-            Log.w(TAG, "bindSocket refused: ${bindResult.exceptionOrNull()?.message}")
-            _terminalError.value = TerminalErrors.NETWORK_BIND_FORBIDDEN
+        // Same failure mode as Xylla; see [XyllaCameraClient.runStream].
+        bindOrTerminal(sock, network, TAG)?.let {
+            _terminalError.value = it
             return
         }
+        sock.soTimeout = 1000
+        sock.receiveBufferSize = 4 * 1024 * 1024
 
         // Initial start cmd burst. The camera replies to whichever source port
         // the burst came from, so this socket has to send AND receive.
@@ -130,7 +128,7 @@ class JegoatSession(
         }
 
         // Keepalive — re-send start cmd periodically so the camera doesn't quietly
-        // stop streaming if it loses track of our session (matches what Wudaopu
+        // stop streaming if it loses track of our session (matches what Xylla
         // needs, costs ~2 bytes/second and is harmless on cameras that don't).
         val keepalive = scope.launch {
             while (isActive) {

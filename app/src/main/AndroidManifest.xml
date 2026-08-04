@@ -13,12 +13,24 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
         tools:targetApi="s" />
 
-    <!-- Location is required on API <= 30 to receive BLE scan results.
-         On API 31+ we use BLUETOOTH_SCAN with neverForLocation. -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
-        android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"
-        android:maxSdkVersion="30" />
+    <!-- Location:
+         - API <=30: needed to receive BLE scan results.
+         - API 31/32: needed for WifiManager.getScanResults().
+         - API 33+: not needed for scan results (NEARBY_WIFI_DEVICES covers
+           that), BUT some OEMs still gate WifiInfo.getSSID() of the current
+           connection on ACCESS_FINE_LOCATION. Requested at runtime only for
+           the Wi-Fi-scan discovery mode; BLE-only users never see the prompt.
+
+         On Android 12+ a user can grant COARSE without FINE, so COARSE must
+         be declared unconditionally (see the CoarseFineLocation lint rule).
+         Our code paths degrade gracefully when only COARSE is granted:
+         Wi-Fi scan results still land, the current-connection SSID may just
+         show masked on some OEMs. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="tiramisu" />
 
     <!-- Joining the camera's hosted WiFi AP. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />

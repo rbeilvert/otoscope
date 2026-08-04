@@ -1,0 +1,1 @@
+Adds support for EarFairy otoscopes, which pair over Wi-Fi rather than Bluetooth. The home screen now lets you pick your model family and takes the right discovery path automatically.
