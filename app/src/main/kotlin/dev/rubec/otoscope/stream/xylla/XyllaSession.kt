@@ -1,4 +1,4 @@
-package dev.rubec.otoscope.stream.wudaopu
+package dev.rubec.otoscope.stream.xylla
 
 import android.graphics.Bitmap
 import android.net.Network
@@ -20,20 +20,21 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * [CameraSession] backed by the Wudaopu video stream client (UDP/8032) and the
- * Wudaopu settings/status control client (UDP/50000). Composes the two into a
- * single object the ViewModel can use without knowing the vendor.
+ * [CameraSession] for the Xylla otoscope family. Backed by the video-stream
+ * client on UDP/8032 and the settings/status control client on UDP/50000.
+ * Composes the two so the ViewModel can consume a single object without
+ * knowing which model is on the wire.
  */
-class WudaopuSession(
+class XyllaSession(
     cameraIp: String,
     network: Network?,
-    /** UDP port for the video/preview channel. Wudaopu / Xylla uses 8032;
-     *  the iTiMO variant uses 8031 with an otherwise-identical wire format. */
+    /** UDP port for the video/preview channel. Xylla uses 8032; the iTiMO
+     *  variant uses 8031 with an otherwise-identical wire format. */
     videoPort: Int = 8032,
 ) : CameraSession {
 
-    private val camera = WudaopuCameraClient(cameraIp = cameraIp, network = network, cmdPort = videoPort)
-    private val control = WudaopuControlClient(cameraIp = cameraIp, network = network)
+    private val camera = XyllaCameraClient(cameraIp = cameraIp, network = network, cmdPort = videoPort)
+    private val control = XyllaControlClient(cameraIp = cameraIp, network = network)
 
     override val frames: SharedFlow<Bitmap> get() = camera.frames
     override val rotation: StateFlow<Float> get() = camera.rotation

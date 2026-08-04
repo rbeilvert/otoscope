@@ -1,30 +1,32 @@
 package dev.rubec.otoscope.vendor
 
+import android.content.Context
 import android.net.Network
 import dev.rubec.otoscope.ble.CameraAdvert
 import dev.rubec.otoscope.stream.CameraSession
-import dev.rubec.otoscope.stream.wudaopu.WudaopuSession
+import dev.rubec.otoscope.stream.xylla.XyllaSession
 
 /**
  * Cameras advertising as `iTiMO-XXXXXX` or `jetion_XXXX`.
  *
  * Sold under the "Smart Visual Ear Cleaner" brand, paired with the "iTiMO"
  * companion app (`com.molink.john.itimo`). The wire protocol is the same
- * as Wudaopu — same BLE-advert envelope (`0x66 0x99` magic + 6-byte BSSID),
+ * as Xylla — same BLE-advert envelope (`0x66 0x99` magic + 6-byte BSSID),
  * same control channel on UDP/50000, same 24-byte frame header on the video
  * channel, but the video/preview UDP port is `8031` instead of `8032`.
- * We reuse [WudaopuSession] with the port override.
+ * We reuse [XyllaSession] with the port override.
  *
  * The reference app scans Wi-Fi results for the `jetion_` prefix
  * (`com.wifiview.config.WifiFunction`) alongside the newer `iTiMO-`
  * branding, so both spellings identify the same hardware family; we
  * accept either as long as the BLE manufacturer-data envelope matches.
  *
- * Registered before [WudaopuVendor] so the SSID-name match wins on adverts
- * whose manufacturer data would otherwise be claimed by Wudaopu's magic check.
+ * Registered before [XyllaVendor] so the SSID-name match wins on adverts
+ * whose manufacturer data would otherwise be claimed by Xylla's magic check.
  */
 object ItimoVendor : CameraVendor {
     override val displayName = "iTiMO"
+    override val discoveryMode = DiscoveryMode.BLE
     // Hard-coded in the reference iTiMO app (`com.wifiview.nativelibs.CmdSocket`
     // and `com.wifiview.config.WifiFunction`). Some devices don't run DHCP and
     // rely on the phone assigning itself a static `192.168.10.X`; when that
@@ -58,6 +60,6 @@ object ItimoVendor : CameraVendor {
         )
     }
 
-    override fun createSession(network: Network?, cameraIp: String): CameraSession =
-        WudaopuSession(cameraIp = cameraIp, network = network, videoPort = VIDEO_PORT)
+    override fun createSession(context: Context, network: Network?, cameraIp: String): CameraSession =
+        XyllaSession(cameraIp = cameraIp, network = network, videoPort = VIDEO_PORT)
 }

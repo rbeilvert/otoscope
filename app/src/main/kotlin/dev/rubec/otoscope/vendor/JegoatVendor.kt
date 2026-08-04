@@ -24,6 +24,7 @@ import java.util.UUID
  */
 object JegoatVendor : CameraVendor {
     override val displayName = "JEGOAT"
+    override val discoveryMode = DiscoveryMode.BLE
     override val defaultCameraIp = "192.168.1.1"
 
     private val COMPANY_ID = byteArrayOf(0x0F, 0x27)
@@ -62,6 +63,6 @@ object JegoatVendor : CameraVendor {
         // Return value intentionally discarded — only the read side-effect matters.
     }
 
-    override fun createSession(network: Network?, cameraIp: String): CameraSession =
+    override fun createSession(context: Context, network: Network?, cameraIp: String): CameraSession =
         JegoatSession(cameraIp = cameraIp, network = network)
 }

@@ -21,13 +21,18 @@ import androidx.compose.ui.layout.ContentScale
  * Renders the latest camera frame inside a circular mask.
  *
  * Two transformations live here:
- *  - **Horizontal mirror**. When [flipEnabled] is true, the image is flipped
- *    horizontally with `scaleX = -1f`. This corrects for lens optics that
- *    deliver a left/right-flipped image.
- *  - **Rotation**. The camera's on-board accelerometer feeds [rotationDegrees].
- *    When [flipEnabled] is true, we negate the rotation because the horizontal
- *    flip reverses the visual sense of rotation. Without the negation a
- *    clockwise hand motion would look counter-clockwise on screen.
+ *  - **Horizontal mirror**. When [flipEnabled] is true the image is flipped
+ *    horizontally with `scaleX = -1f`. Corrects for lens optics that deliver
+ *    a left/right-flipped image.
+ *  - **Rotation**. The camera's on-board accelerometer feeds [rotationDegrees]
+ *    for vendors that expose it. When [flipEnabled] is true we negate the
+ *    rotation because the horizontal flip reverses the visual sense — without
+ *    the negation a clockwise hand motion would look counter-clockwise.
+ *
+ *  The angle is passed straight through to `rotationZ` per telemetry sample —
+ *  no session-level EMA and no Compose-level tween. We tried both and neither
+ *  produced a visibly smoother image; the accelerometer already gives us a
+ *  stable stream at ~20 Hz, and any extra filter only adds perceivable lag.
  */
 @Composable
 fun CameraFrame(

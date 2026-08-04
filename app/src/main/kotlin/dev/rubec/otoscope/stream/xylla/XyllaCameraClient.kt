@@ -1,11 +1,11 @@
-package dev.rubec.otoscope.stream.wudaopu
+package dev.rubec.otoscope.stream.xylla
 
 import android.graphics.Bitmap
 import android.net.Network
 import dev.rubec.otoscope.debug.FileLog as Log
 import dev.rubec.otoscope.stream.JpegDecoder
 import dev.rubec.otoscope.stream.SessionStats
-import dev.rubec.otoscope.stream.TerminalErrors
+import dev.rubec.otoscope.stream.bindOrTerminal
 import dev.rubec.otoscope.stream.toHex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,13 +29,13 @@ import java.net.InetSocketAddress
 import java.net.SocketTimeoutException
 
 /**
- * Wudaopu video-stream client. Sends a "start preview" cmd on UDP/8032, reads
+ * Xylla video-stream client. Sends a "start preview" cmd on UDP/8032, reads
  * 24-byte-header MJPEG/YUYV chunks back on the same socket, assembles frames
  * via [FrameAssembler], and decodes them to Bitmaps.
  *
  * Vendor-specific wire format details are in `FrameAssembler.kt`.
  */
-internal class WudaopuCameraClient(
+internal class XyllaCameraClient(
     private val cameraIp: String,
     private val network: Network?,
     private val cmdPort: Int = 8032,
@@ -74,23 +74,21 @@ internal class WudaopuCameraClient(
 
     private suspend fun runStream() {
         val sock = DatagramSocket().also { socket = it }
-        val bindResult = runCatching { network?.bindSocket(sock) }
+        // If we have a network handle but the OS refused the bind, our packets
+        // would silently route through some other interface (typically a VPN)
+        // and never reach the camera. Fail fast so the ViewModel can surface a
+        // specific, actionable message instead of the user waiting on frames.
+        bindOrTerminal(sock, network, TAG)?.let {
+            _terminalError.value = it
+            return
+        }
         sock.soTimeout = 1000
         sock.receiveBufferSize = 4 * 1024 * 1024
         Log.i(
             TAG,
             "runStream: cameraIp=$cameraIp cmdPort=$cmdPort " +
-                "network=${network != null} bindSocket=${bindResult.isSuccess} localPort=${sock.localPort}",
+                "network=${network != null} localPort=${sock.localPort}",
         )
-        // If we have a network handle but the OS refused the bind, our packets
-        // would silently route through some other interface (typically a VPN)
-        // and never reach the camera. Fail fast so the ViewModel can surface a
-        // specific, actionable message instead of the user waiting on frames.
-        if (network != null && bindResult.isFailure) {
-            Log.w(TAG, "bindSocket refused: ${bindResult.exceptionOrNull()?.message}")
-            _terminalError.value = TerminalErrors.NETWORK_BIND_FORBIDDEN
-            return
-        }
 
         val cameraAddr = InetAddress.getByName(cameraIp)
         val cmdAddr = InetSocketAddress(cameraAddr, cmdPort)
@@ -188,7 +186,7 @@ internal class WudaopuCameraClient(
     }
 
     companion object {
-        private const val TAG = "WudaopuClient"
+        private const val TAG = "XyllaClient"
 
         // Preview-channel opcodes, from the AIR-Look teardown.
         private const val CMD_START_PREVIEW = 1

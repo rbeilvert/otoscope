@@ -1,7 +1,7 @@
-package dev.rubec.otoscope.stream.wudaopu
+package dev.rubec.otoscope.stream.xylla
 
 /**
- * Assembles the chunked video frames the Wudaopu otoscope sends over UDP/8032.
+ * Assembles the chunked video frames the Xylla otoscope sends over UDP/8032.
  *
  * Each UDP datagram carries a 24-byte header followed by `chunk_len` bytes of
  * payload:

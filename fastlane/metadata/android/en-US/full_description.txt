@@ -14,8 +14,9 @@ Features:
 
 Supported hardware families:
 
-• Wudaopu / Xylla — Wi-Fi SSID `Enjoy-XXXXXX` or `JesHome-XXXX`.
-• iTiMO — Wi-Fi SSID `iTiMO-XXXXXX`.
-• Shenzhen Jiding / JEGOAT — Wi-Fi SSID `softish-XXXXXX`.
+• Xylla — SSID `Enjoy-XXXXXX` or `JesHome-XXXX`.
+• iTiMO — SSID `iTiMO-XXXXXX` or `jetion_XXXX`.
+• JEGOAT — SSID `softish-XXXXXX`.
+• EarFairy — SSID `Cooleer_XXXXXX`.
 
 Otoscope is GPL-3.0-or-later and contains no third-party trackers, ad SDKs, or proprietary native libraries.

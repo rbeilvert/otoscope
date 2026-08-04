@@ -1,4 +1,4 @@
-package dev.rubec.otoscope.stream.wudaopu
+package dev.rubec.otoscope.stream.xylla
 
 import android.net.Network
 import dev.rubec.otoscope.debug.FileLog as Log
@@ -16,14 +16,14 @@ import java.net.SocketTimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Wudaopu settings/status channel on UDP/50000.
+ * Xylla settings/status channel on UDP/50000.
  *
  * Wire format mirrors the streaming channel: 24-byte request with magic
  * `0x9999` + 16-bit command + 32-bit counter + 16 zero bytes. The camera
  * echoes the magic+cmd at the start of every reply, with a command-specific
  * payload following.
  */
-internal class WudaopuControlClient(
+internal class XyllaControlClient(
     private val cameraIp: String,
     private val network: Network?,
     private val port: Int = 50000,
@@ -49,7 +49,6 @@ internal class WudaopuControlClient(
         // four fields above on any hardware we've tested.
         val main = readU32LE(reply, 8)
         val extra = readU32LE(reply, 16)
-        Log.d(TAG, "battery raw: main=0x%08x extra=0x%08x".format(main, extra))
 
         val percent = (extra and 0xFFFF).coerceIn(0, 100)
         val status = main ushr 16
@@ -150,7 +149,7 @@ internal class WudaopuControlClient(
             ((b[off + 3].toInt() and 0xff) shl 24)
 
     companion object {
-        private const val TAG = "WudaopuCtrl"
+        private const val TAG = "XyllaCtrl"
         private const val CMD_GET_BATTERY = 0x1017
         private const val CMD_GET_BOARD_INFO = 0x1060
         private const val CMD_GET_REMOTE_VERSION = 0x1002

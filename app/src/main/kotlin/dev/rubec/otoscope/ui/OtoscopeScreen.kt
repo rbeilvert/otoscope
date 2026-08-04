@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothDisabled
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Wifi
@@ -33,6 +34,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Switch
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +55,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.rubec.otoscope.BuildConfig
 import dev.rubec.otoscope.ble.CameraAdvert
 import dev.rubec.otoscope.stream.BatteryStatus
+import dev.rubec.otoscope.vendor.CameraVendors
+import dev.rubec.otoscope.vendor.DiscoveryMode
 import dev.rubec.otoscope.vm.CameraState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,11 +64,9 @@ import dev.rubec.otoscope.vm.CameraState
 fun OtoscopeScreen(
     state: CameraState,
     adverts: List<CameraAdvert>,
-    permissionsGranted: Boolean,
-    onRequestPermissions: () -> Unit,
     onEnableBluetooth: () -> Unit,
     onEnableWifi: () -> Unit,
-    onStartScan: () -> Unit,
+    onStartScan: (DiscoveryMode) -> Unit,
     onStopScan: () -> Unit,
     onConnect: (CameraAdvert) -> Unit,
     onDisconnect: () -> Unit,
@@ -77,10 +79,8 @@ fun OtoscopeScreen(
                 actions = {
                     DeviceActions(
                         state = state,
-                        permissionsGranted = permissionsGranted,
                         onEnableBluetooth = onEnableBluetooth,
                         onEnableWifi = onEnableWifi,
-                        onStartScan = onStartScan,
                         onStopScan = onStopScan,
                         onDisconnect = onDisconnect,
                     )
@@ -95,15 +95,23 @@ fun OtoscopeScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (state) {
                 is CameraState.Streaming -> StreamingView(state, onDisconnect, onSetFlip)
-                else -> ScanView(
+                is CameraState.Scanning,
+                is CameraState.Found,
+                is CameraState.Connecting -> ScanView(
                     state = state,
                     adverts = adverts,
-                    permissionsGranted = permissionsGranted,
-                    onRequestPermissions = onRequestPermissions,
-                    onStartScan = onStartScan,
-                    onStopScan = onStopScan,
                     onConnect = onConnect,
-                    padding = PaddingValues(16.dp)
+                    onEnableWifi = onEnableWifi,
+                    padding = PaddingValues(16.dp),
+                )
+                // Everything else (Idle, Error, Disconnected, BluetoothOff,
+                // WifiOff) lands on the home screen. The picker stays visible
+                // so the user can pick the other discovery path even if the
+                // required radio for one of them is off.
+                else -> HomeView(
+                    state = state,
+                    onStartScan = onStartScan,
+                    padding = PaddingValues(16.dp),
                 )
             }
         }
@@ -113,13 +121,15 @@ fun OtoscopeScreen(
 @Composable
 private fun DeviceActions(
     state: CameraState,
-    permissionsGranted: Boolean,
     onEnableBluetooth: () -> Unit,
     onEnableWifi: () -> Unit,
-    onStartScan: () -> Unit,
     onStopScan: () -> Unit,
     onDisconnect: () -> Unit,
 ) {
+    // The top-bar action set is now purely context-sensitive: disconnect while
+    // streaming, stop while scanning, or "Turn on Bluetooth / Wi-Fi" if the
+    // corresponding radio is off. The "start scan" affordance moved into the
+    // home-screen model picker, so there's no explicit Scan button here anymore.
     when {
         state is CameraState.Streaming -> {
             OutlinedButton(onClick = onDisconnect) {
@@ -147,61 +157,144 @@ private fun DeviceActions(
                 Text("Turn on Wi-Fi")
             }
         }
-        permissionsGranted && state !is CameraState.Connecting -> {
-            Button(onClick = onStartScan) {
-                Icon(Icons.Default.Bluetooth, contentDescription = null)
-                Spacer(Modifier.size(8.dp))
-                Text("Scan")
-            }
-        }
     }
 }
 
+/**
+ * Landing screen. User picks how to find their camera. Two paths:
+ *  - **Bluetooth pairing** for BLE-advertising models (Xylla, iTiMO,
+ *    JEGOAT). BLE scan → parse advert → auto-join the camera Wi-Fi.
+ *  - **Wi-Fi scan** for models without BLE (EarFairy). Wi-Fi scan filtered by
+ *    SSID prefix → user taps to connect.
+ *
+ * The cards are always rendered. Runtime-permission gating and the enable-radio
+ * flow happen after the user's tap (see [MainActivity]) so someone streaming
+ * only from EarFairy is never asked for Bluetooth permission.
+ *
+ * Error / Disconnected banners still render here so they land the user back on
+ * the picker with a chance to try again.
+ */
 @Composable
-private fun ScanView(
+private fun HomeView(
     state: CameraState,
-    adverts: List<CameraAdvert>,
-    permissionsGranted: Boolean,
-    onRequestPermissions: () -> Unit,
-    onStartScan: () -> Unit,
-    onStopScan: () -> Unit,
-    onConnect: (CameraAdvert) -> Unit,
+    onStartScan: (DiscoveryMode) -> Unit,
     padding: PaddingValues,
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
         when (state) {
-            is CameraState.Connecting -> ConnectingHeader(state.advert.ssid, state.attempt, state.totalAttempts)
             is CameraState.Error -> ErrorHeader(state.message)
             is CameraState.Disconnected -> DisconnectedHeader(state.reason)
+            is CameraState.BluetoothOff ->
+                IconMessage(Icons.Default.BluetoothDisabled, "Bluetooth is off. Turn it on to pair a BLE camera.")
+            is CameraState.WifiOff ->
+                IconMessage(Icons.Default.WifiOff, "Wi-Fi is off. Turn it on to connect to a camera.")
+            else -> Unit
+        }
+        if (state is CameraState.BluetoothOff || state is CameraState.WifiOff) Spacer(Modifier.height(16.dp))
+
+        Text(
+            "Pick the model of your otoscope",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(Modifier.height(16.dp))
+
+        DiscoveryModeCard(
+            models = CameraVendors.bleVendors.map { it.displayName },
+            method = "Pair via Bluetooth",
+            icon = Icons.Default.Bluetooth,
+            onClick = { onStartScan(DiscoveryMode.BLE) },
+        )
+        Spacer(Modifier.height(12.dp))
+        DiscoveryModeCard(
+            models = CameraVendors.wifiScanVendors.map { it.displayName },
+            method = "Connect via Wi-Fi",
+            icon = Icons.Default.Wifi,
+            onClick = { onStartScan(DiscoveryMode.WIFI_SCAN) },
+        )
+    }
+}
+
+/** Home-page card: model names listed one per line (so the user can see at
+ *  a glance which card handles their otoscope), followed by the pairing
+ *  method as a caption. */
+@Composable
+private fun DiscoveryModeCard(
+    models: List<String>,
+    method: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+        onClick = onClick,
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                for (model in models) {
+                    Text(
+                        model,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+            Spacer(Modifier.size(16.dp))
+            Text(
+                method,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.size(8.dp))
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+    }
+}
+
+/** Scan-in-progress + results screen. Reached after the user tapped one of the
+ *  home-screen model-picker cards. */
+@Composable
+private fun ScanView(
+    state: CameraState,
+    adverts: List<CameraAdvert>,
+    onConnect: (CameraAdvert) -> Unit,
+    onEnableWifi: () -> Unit,
+    padding: PaddingValues,
+) {
+    val mode = when (state) {
+        is CameraState.Scanning -> state.mode
+        is CameraState.Found -> state.advert.vendor.discoveryMode
+        is CameraState.Connecting -> state.advert.vendor.discoveryMode
+        else -> null
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        when (state) {
+            is CameraState.Connecting -> ConnectingHeader(state.advert.ssid, state.attempt, state.totalAttempts)
             else -> Unit
         }
 
-        when {
-            !permissionsGranted -> {
-                Button(onClick = onRequestPermissions) {
-                    Text("Grant Bluetooth permission")
-                }
-            }
-            state is CameraState.BluetoothOff -> {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.BluetoothDisabled, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    Text("Bluetooth is off — use the button above to turn it on.")
-                }
-            }
-            state is CameraState.WifiOff -> {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.WifiOff, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    Text("Wi-Fi is off — use the button above to turn it on.")
-                }
-            }
-            state is CameraState.Scanning || state is CameraState.Found -> {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.size(12.dp))
-                    Text("Scanning for camera...", style = MaterialTheme.typography.bodyMedium)
-                }
+        when (state) {
+            is CameraState.BluetoothOff -> IconMessage(Icons.Default.BluetoothDisabled, "Bluetooth is off. Use the button above to turn it on.")
+            is CameraState.WifiOff -> IconMessage(Icons.Default.WifiOff, "Wi-Fi is off. Use the button above to turn it on.")
+            is CameraState.Scanning, is CameraState.Found -> Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                Spacer(Modifier.size(12.dp))
+                Text(
+                    when (mode) {
+                        DiscoveryMode.BLE -> "Scanning over Bluetooth..."
+                        DiscoveryMode.WIFI_SCAN -> "Scanning nearby Wi-Fi networks..."
+                        null -> "Scanning..."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
             else -> Unit
         }
@@ -210,14 +303,37 @@ private fun ScanView(
 
         if (adverts.isEmpty()) {
             Text(
-                "Power on the otoscope and tap Scan. It will appear here as soon as we " +
-                    "pick up its BLE advertisement.",
+                when (mode) {
+                    DiscoveryMode.WIFI_SCAN ->
+                        "Power on the otoscope. It will appear here once its Wi-Fi network shows up in scans."
+                    else ->
+                        "Power on the otoscope. It will appear here as soon as we pick up its BLE advertisement."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Wi-Fi-scan fallback. Some devices refuse to hand scan results to
+            // apps (OEM Location Services gate, throttling, …), but Android
+            // still shows the camera in system Wi-Fi settings. Give the user a
+            // one-tap shortcut: join from settings, come back, and the current
+            // connection is picked up automatically.
+            if (mode == DiscoveryMode.WIFI_SCAN) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Can't see your camera?\nJoin it directly from Android's Wi-Fi settings:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = onEnableWifi) {
+                    Icon(Icons.Default.Wifi, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text("Open Wi-Fi settings")
+                }
+            }
         } else {
             Text(
-                "Tap a camera to join its Wi-Fi. Android will ask you to confirm — " +
+                "Tap a camera to join its Wi-Fi. Android will ask you to confirm; " +
                     "approve the prompt to connect.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -230,6 +346,15 @@ private fun ScanView(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun IconMessage(icon: androidx.compose.ui.graphics.vector.ImageVector, message: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null)
+        Spacer(Modifier.size(8.dp))
+        Text(message)
     }
 }
 
@@ -336,6 +461,20 @@ private fun StreamingView(
 
         CameraStatus(modelName = model, ssid = state.advert.ssid, battery = battery)
 
+        // Ring-light control, shown only for vendors that expose it
+        // (currently EarFairy). Local echo is instant; the camera doesn't
+        // acknowledge but the LED responds within a video frame or two.
+        state.session.led?.let { led ->
+            val ledOn by led.enabled.collectAsStateWithLifecycle()
+            LabeledSwitch(
+                icon = Icons.Default.Lightbulb,
+                title = "Ring light",
+                subtitle = "Toggle the LEDs around the otoscope tip.",
+                checked = ledOn,
+                onCheckedChange = { led.setEnabled(it) },
+            )
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -360,6 +499,32 @@ private fun StreamingView(
         if (BuildConfig.DEBUG && diagnostics.isNotEmpty()) {
             DiagnosticsOverlay(diagnostics)
         }
+    }
+}
+
+@Composable
+private fun LabeledSwitch(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.size(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
