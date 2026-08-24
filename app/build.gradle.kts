@@ -85,6 +85,17 @@ kotlin {
     }
 }
 
+// Make the Unit tests step self-evident in CI logs: without this the task
+// runs but prints nothing, so a passing run and a "no test sources" run
+// look identical. Emitting one line per test result both proves the tests
+// ran and pinpoints the failing test without downloading the HTML report.
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = false
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -101,4 +112,12 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.ui.tooling)
+
+    // Unit tests run on the local JVM (no emulator, no Android runtime), which
+    // is enough for the pure-Kotlin protocol parsers and socket-driven fake
+    // cameras. Any test that needs real Android APIs would go in
+    // `androidTest/` instead, but we're not there yet.
+    testImplementation(libs.junit)
+    testImplementation(kotlin("test-junit"))
+    testImplementation(libs.kotlinx.coroutines.test)
 }

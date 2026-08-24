@@ -46,9 +46,27 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+      - name: Unit tests
+        # Regression floor for the camera-protocol parsers (frame assemblers, RTSP client,
+        # BLE advert parsers, etc.). Runs on the local JVM, with no emulator.
+        id: tests
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Upload test report
+        if: always() && steps.tests.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-results-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
+
       - name: Android Lint (release variant)
-        # After the upload so a lint failure still leaves reviewers an APK to
-        # install. The step failing still fails the job.
+        # After the APK upload and tests so a lint or test failure still
+        # leaves reviewers an APK to install, and both check signals surface
+        # on the same run (a test failure shouldn't hide a lint regression).
+        if: success() || failure()
         run: ./gradlew lintRelease
 
       - name: Upload lint report
