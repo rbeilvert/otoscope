@@ -4,6 +4,14 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-08-31
+
+### Added
+- **Photo and video capture.** A capture bar at the bottom of the streaming screen, with a shutter button and a photo / video selector. Stills are written to `Pictures/Otoscope` as JPEG, clips to `Movies/Otoscope` as H.264 MP4, both through the media store so they show up in your usual gallery app. No storage permission is requested and no audio is recorded.
+- Captures are saved the way the otoscope sees the ear: orientation-corrected, clipped to the circular lens mask on a black background, and never mirrored. The on-screen mirror toggle still works for self-examination, but doesn't flip what gets written to disk.
+- **Overlay caption.** A free-text field ("Left ear", "Right ear", anything you like), burnt in small white type into the bottom-left corner of every photo and clip and previewed live in the viewport. It sits folded away just above the shutter until you need it.
+- **In-app gallery**, reachable from beside the shutter button. Thumbnail grid of everything captured, with full-screen review, clip playback, share and delete.
+
 ## [0.6.0] — 2026-08-04
 
 ### Added
@@ -14,7 +22,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 - Renamed the "Wudaopu / Xylla" family to "Xylla" and "JEGOAT / EarVision" to "JEGOAT" throughout the app UI and code.
-
 
 ## [0.5.3] — 2026-07-29
 

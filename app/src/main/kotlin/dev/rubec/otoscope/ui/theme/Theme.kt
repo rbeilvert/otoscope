@@ -2,7 +2,9 @@ package dev.rubec.otoscope.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -29,3 +31,12 @@ fun OtoscopeTheme(
     }
     MaterialTheme(colorScheme = colorScheme, content = content)
 }
+
+/** Shared top-bar palette. The home screen, the gallery grid and the media
+ *  viewer all use it, so they can't drift apart. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun otoscopeTopAppBarColors() = TopAppBarDefaults.topAppBarColors(
+    containerColor = MaterialTheme.colorScheme.primaryContainer,
+    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+)

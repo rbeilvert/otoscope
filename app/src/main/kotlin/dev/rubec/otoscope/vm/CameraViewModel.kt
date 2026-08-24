@@ -9,6 +9,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.rubec.otoscope.ble.CameraAdvert
 import dev.rubec.otoscope.ble.CameraBleScanner
+import dev.rubec.otoscope.capture.CaptureController
 import dev.rubec.otoscope.stream.BatteryStatus
 import dev.rubec.otoscope.stream.CameraSession
 import dev.rubec.otoscope.stream.TerminalErrors
@@ -69,6 +70,10 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _adverts = MutableStateFlow<List<CameraAdvert>>(emptyList())
     val adverts: StateFlow<List<CameraAdvert>> = _adverts.asStateFlow()
+
+    /** Photo / video capture and the saved-media listing. Outlives individual
+     *  sessions so the gallery and the caption survive a reconnect. */
+    val capture = CaptureController(app, viewModelScope)
 
     private var scanJob: Job? = null
     private var stallWatchdogJob: Job? = null
@@ -190,6 +195,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         )
         flipEnabled.value = true
         session.start()
+        capture.attach(session)
 
         val frameState = session.frames
             .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null as Bitmap?)
@@ -279,6 +285,9 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         val streaming = _state.value as? CameraState.Streaming ?: return
         stallWatchdogJob?.cancel()
         stallWatchdogJob = null
+        // Detach before tearing the session down so a clip that was running is
+        // finalised and kept rather than lost with the socket.
+        capture.detach()
         runCatching { streaming.session.close() }
         runCatching { wifi.disconnect() }
         val message = when (code) {
@@ -308,6 +317,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         Log.i(TAG, "unexpected disconnect: $reason")
         stallWatchdogJob?.cancel()
         stallWatchdogJob = null
+        capture.detach()
 
         // Session close involves socket teardown that can throw when the
         // underlying network is already gone — swallow, we're bailing anyway.
@@ -340,6 +350,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     fun disconnect() {
         stallWatchdogJob?.cancel()
         stallWatchdogJob = null
+        capture.detach()
         runCatching { (state.value as? CameraState.Streaming)?.session?.close() }
         runCatching { wifi.disconnect() }
         _state.value = CameraState.Idle
@@ -347,6 +358,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         disconnect()
+        capture.close()
     }
 
     companion object {

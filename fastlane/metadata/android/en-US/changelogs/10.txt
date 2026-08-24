@@ -1,0 +1,1 @@
+Adds photo and video capture. Stills are saved to Pictures/Otoscope and clips to Movies/Otoscope, as you see them on screen but without the mirror. An optional caption such as "Left ear" can be burnt into the corner of each capture, and a built-in gallery lets you review, play back, share and delete them. No storage permission is requested and no audio is recorded.
