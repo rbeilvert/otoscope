@@ -10,11 +10,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Battery2Bar
 import androidx.compose.material.icons.filled.Battery4Bar
@@ -40,21 +44,32 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.rubec.otoscope.BuildConfig
 import dev.rubec.otoscope.ble.CameraAdvert
+import dev.rubec.otoscope.capture.CaptureController
+import dev.rubec.otoscope.capture.CaptureEvent
+import dev.rubec.otoscope.capture.CaptureMode
 import dev.rubec.otoscope.stream.BatteryStatus
+import dev.rubec.otoscope.ui.theme.otoscopeTopAppBarColors
 import dev.rubec.otoscope.vendor.CameraVendors
 import dev.rubec.otoscope.vendor.DiscoveryMode
 import dev.rubec.otoscope.vm.CameraState
@@ -64,6 +79,7 @@ import dev.rubec.otoscope.vm.CameraState
 fun OtoscopeScreen(
     state: CameraState,
     adverts: List<CameraAdvert>,
+    capture: CaptureController,
     onEnableBluetooth: () -> Unit,
     onEnableWifi: () -> Unit,
     onStartScan: (DiscoveryMode) -> Unit,
@@ -72,7 +88,30 @@ fun OtoscopeScreen(
     onDisconnect: () -> Unit,
     onSetFlip: (Boolean) -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val savedMedia by capture.media.collectAsStateWithLifecycle()
+    var showGallery by remember { mutableStateOf(false) }
+
+    // One listing on first composition, then the controller refreshes itself
+    // after every save and delete.
+    LaunchedEffect(capture) { capture.refreshMedia() }
+    LaunchedEffect(capture, snackbarHostState) {
+        capture.events.collect { event ->
+            snackbarHostState.showSnackbar(
+                when (event) {
+                    is CaptureEvent.Saved ->
+                        if (event.isVideo) "Clip saved to Movies/Otoscope"
+                        else "Photo saved to Pictures/Otoscope"
+                    is CaptureEvent.Deleted -> "Deleted ${event.name}"
+                    is CaptureEvent.Failed -> event.message
+                }
+            )
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Otoscope") },
@@ -85,16 +124,25 @@ fun OtoscopeScreen(
                         onDisconnect = onDisconnect,
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+                colors = otoscopeTopAppBarColors()
             )
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (state) {
-                is CameraState.Streaming -> StreamingView(state, onDisconnect, onSetFlip)
+                is CameraState.Streaming -> StreamingView(
+                    state = state,
+                    capture = capture,
+                    onSetFlip = onSetFlip,
+                    onOpenGallery = {
+                        // The caption field's text-selection handles are drawn
+                        // in their own window, which the gallery can't cover —
+                        // so let go of focus before it opens.
+                        focusManager.clearFocus()
+                        capture.refreshMedia()
+                        showGallery = true
+                    },
+                )
                 is CameraState.Scanning,
                 is CameraState.Found,
                 is CameraState.Connecting -> ScanView(
@@ -116,6 +164,17 @@ fun OtoscopeScreen(
             }
         }
     }
+
+    // Outside the Scaffold on purpose: the gallery takes over the whole window,
+    // top bar included, while the session underneath keeps streaming (and keeps
+    // recording, if a clip is running).
+    if (showGallery) {
+        GalleryScreen(
+            media = savedMedia,
+            onClose = { showGallery = false },
+            onDelete = capture::delete,
+        )
+    }
 }
 
 @Composable
@@ -126,10 +185,10 @@ private fun DeviceActions(
     onStopScan: () -> Unit,
     onDisconnect: () -> Unit,
 ) {
-    // The top-bar action set is now purely context-sensitive: disconnect while
+    // The top-bar action set is purely context-sensitive: disconnect while
     // streaming, stop while scanning, or "Turn on Bluetooth / Wi-Fi" if the
     // corresponding radio is off. The "start scan" affordance moved into the
-    // home-screen model picker, so there's no explicit Scan button here anymore.
+    // home-screen model picker.
     when {
         state is CameraState.Streaming -> {
             OutlinedButton(onClick = onDisconnect) {
@@ -429,8 +488,9 @@ private fun DisconnectedHeader(reason: String) {
 @Composable
 private fun StreamingView(
     state: CameraState.Streaming,
-    onDisconnect: () -> Unit,
+    capture: CaptureController,
     onSetFlip: (Boolean) -> Unit,
+    onOpenGallery: () -> Unit,
 ) {
     val frame by state.frame.collectAsStateWithLifecycle()
     val rotation by state.rotation.collectAsStateWithLifecycle()
@@ -438,6 +498,13 @@ private fun StreamingView(
     val battery by state.battery.collectAsStateWithLifecycle()
     val diagnostics by state.diagnostics.collectAsStateWithLifecycle()
     val flipEnabled by state.flipEnabled.collectAsStateWithLifecycle()
+
+    val overlayText by capture.overlayText.collectAsStateWithLifecycle()
+    val recording by capture.recording.collectAsStateWithLifecycle()
+    val recordingElapsedMs by capture.recordingElapsedMs.collectAsStateWithLifecycle()
+    val savingPhoto by capture.savingPhoto.collectAsStateWithLifecycle()
+    val savedMedia by capture.media.collectAsStateWithLifecycle()
+    var mode by rememberSaveable { mutableStateOf(CaptureMode.PHOTO) }
 
     // Prevent the screen from sleeping while a stream is on-screen. Scoped to
     // the composable so it flips back off automatically when the user disconnects
@@ -448,57 +515,90 @@ private fun StreamingView(
         onDispose { view.keepScreenOn = false }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        CameraFrame(
-            frame = frame,
-            rotationDegrees = rotation,
-            flipEnabled = flipEnabled,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        CameraStatus(modelName = model, ssid = state.advert.ssid, battery = battery)
-
-        // Ring-light control, shown only for vendors that expose it
-        // (currently EarFairy). Local echo is instant; the camera doesn't
-        // acknowledge but the LED responds within a video frame or two.
-        state.session.led?.let { led ->
-            val ledOn by led.enabled.collectAsStateWithLifecycle()
-            LabeledSwitch(
-                icon = Icons.Default.Lightbulb,
-                title = "Ring light",
-                subtitle = "Toggle the LEDs around the otoscope tip.",
-                checked = ledOn,
-                onCheckedChange = { led.setEnabled(it) },
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+    Column(modifier = Modifier.fillMaxSize().imePadding()) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Mirror view",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    "Check to examine yourself, uncheck to examine someone else.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // The frame takes whatever height the controls leave and stays
+            // square, so it gives way to the keyboard or the unfolded caption
+            // field instead of pushing them off-screen. Nothing here scrolls.
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CameraFrame(
+                    frame = frame,
+                    rotationDegrees = rotation,
+                    flipEnabled = flipEnabled,
+                    overlayText = overlayText,
                 )
             }
-            Checkbox(
-                checked = flipEnabled,
-                onCheckedChange = onSetFlip,
-            )
+
+            CameraStatus(modelName = model, ssid = state.advert.ssid, battery = battery)
+
+            // Ring-light control, shown only for vendors that expose it
+            // (currently EarFairy). Local echo is instant; the camera doesn't
+            // acknowledge but the LED responds within a video frame or two.
+            state.session.led?.let { led ->
+                val ledOn by led.enabled.collectAsStateWithLifecycle()
+                LabeledSwitch(
+                    icon = Icons.Default.Lightbulb,
+                    title = "Ring light",
+                    subtitle = "Toggle the LEDs around the otoscope tip.",
+                    checked = ledOn,
+                    onCheckedChange = { led.setEnabled(it) },
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Mirror view",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        "Check to examine yourself, uncheck to examine someone else. " +
+                            "Saved photos and clips are never mirrored.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Checkbox(
+                    checked = flipEnabled,
+                    onCheckedChange = onSetFlip,
+                )
+            }
+
+            if (BuildConfig.DEBUG && diagnostics.isNotEmpty()) {
+                DiagnosticsOverlay(diagnostics)
+            }
         }
 
-        if (BuildConfig.DEBUG && diagnostics.isNotEmpty()) {
-            DiagnosticsOverlay(diagnostics)
-        }
+        CaptureBar(
+            mode = mode,
+            onModeChange = { mode = it },
+            recording = recording,
+            savingPhoto = savingPhoto,
+            elapsedMs = recordingElapsedMs,
+            latest = savedMedia.firstOrNull(),
+            overlayText = overlayText,
+            onOverlayTextChange = capture::setOverlayText,
+            onShutter = {
+                when (mode) {
+                    // The photo is composed from the same frame the viewport is
+                    // showing, so what lands on disk is the moment the user saw.
+                    CaptureMode.PHOTO -> capture.capturePhoto(frame)
+                    CaptureMode.VIDEO -> capture.toggleRecording()
+                }
+            },
+            onOpenGallery = onOpenGallery,
+        )
     }
 }
 
@@ -533,7 +633,9 @@ private fun DiagnosticsOverlay(values: Map<String, String>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(max = 140.dp)
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+            .verticalScroll(rememberScrollState())
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {

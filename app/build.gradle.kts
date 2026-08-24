@@ -25,8 +25,8 @@ android {
         applicationId = "dev.rubec.otoscope"
         minSdk = 29
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.6.0"
+        versionCode = 10
+        versionName = "0.7.0"
 
         vectorDrawables { useSupportLibrary = true }
     }
@@ -114,9 +114,10 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
 
     // Unit tests run on the local JVM (no emulator, no Android runtime), which
-    // is enough for the pure-Kotlin protocol parsers and socket-driven fake
-    // cameras. Any test that needs real Android APIs would go in
-    // `androidTest/` instead, but we're not there yet.
+    // is enough for the pure-Kotlin protocol parsers, the socket-driven fake
+    // cameras, and the capture geometry / naming / encoder-timing rules. Any
+    // test that needs real Android APIs would go in `androidTest/` instead, but
+    // we're not there yet.
     testImplementation(libs.junit)
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.kotlinx.coroutines.test)

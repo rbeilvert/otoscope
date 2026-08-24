@@ -17,6 +17,8 @@ Otoscope is a reverse-engineered drop-in replacement for the proprietary compani
 - Auto-rotates the image using the camera's on-board accelerometer / gyro, clipped to a circular mask matching the otoscope lens.
 - Horizontal-mirror toggle for self-examination.
 - Ring-light on/off toggle and charging indicator on models that expose them.
+- Photo and video capture, written straight to `Pictures/Otoscope` and `Movies/Otoscope`, with an in-app gallery to review, share and delete them.
+- Optional free-text caption (e.g. "Left ear") burnt into the corner of every capture.
 
 ## Hardware compatibility
 
@@ -60,7 +62,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 | Horizontal-mirror toggle   | ✅ for self-examination                  |
 | Screen stays awake         | ✅ during live stream                    |
 | Battery + model readout    | ✅ where the camera exposes it           |
-| Photo / video capture      | not implemented yet                     |
+| Photo / video capture      | ✅ JPEG stills and H.264 MP4 clips        |
+| Capture gallery            | ✅ in-app review, share and delete       |
 | Brightness control    | 🚧 On-Off implemented for EarFairy      |
 
 ## License

@@ -92,6 +92,7 @@ class MainActivity : ComponentActivity() {
                     OtoscopeScreen(
                         state = state,
                         adverts = adverts,
+                        capture = vm.capture,
                         onEnableBluetooth = {
                             enableBtLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
                         },
