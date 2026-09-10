@@ -22,7 +22,7 @@ Otoscope is a reverse-engineered drop-in replacement for the proprietary compani
 
 ## Hardware compatibility
 
-The app supports four camera families across two discovery paths. Pick your family on the home screen; the app scans the right way and hands the video off to the vendor-specific protocol automatically.
+The app supports five camera families across two discovery paths. Pick your family on the home screen; the app scans the right way and hands the video off to the vendor-specific protocol automatically.
 
 | Family        | Discovery | SSID prefix                      | Wi-Fi auth | Video | Companion app |
 |---------------|-----------|----------------------------------| ---------- | ----- | ------------- |
@@ -30,6 +30,7 @@ The app supports four camera families across two discovery paths. Pick your fami
 | **iTiMO**     | BLE       | `iTiMO-XXXXXX`<br>`jetion_XXXX`    | open | UDP/8031 MJPEG | "iTiMO" (`com.molink.john.itimo`) |
 | **JEGOAT**    | BLE       | `softish-XXXXXX`                 | WPA2 | UDP/61501 MJPEG | "EarVision" (`com.atomath.wifi_camera`) |
 | **EarFairy**  | Wi-Fi     | `Cooleer_XXXXXX`                 | open | RTSP/7070 MJPEG | "Cooleer" (`com.cooingdv.cooleer`) |
+| **NE3**       | Wi-Fi     | `HNDEC_XXXXXX`                   | WPA2 | UDP/8800 MJPEG | "HND" (`com.xiaozhen.beauty.hnd`) |
 
 If you have a wireless otoscope that isn't picked up by Otoscope, please file an issue including preferably
 the original companion application ID, a screenshot of the BLE advertisement (e.g. from nRF Connect),

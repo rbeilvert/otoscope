@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Support for **NE3** otoscopes, sold with the "HND" companion app (`com.xiaozhen.beauty.hnd`) and built around Bouffalo Lab BL602 hardware. Discovery is via Wi-Fi scan; the app lists any `HNDEC_XXXXXX` access point and joins with the vendor-baked WPA2 passphrase automatically. Live video is a headerless fragmented MJPEG stream on UDP/8800 with a Q75 JPEG header from the vendor SDK prepended per frame. Rotation, battery, LED, and photo-button telemetry channels on this hardware are not yet decoded and stay at their defaults for now.
+
 ## [0.7.0] — 2026-08-31
 
 ### Added

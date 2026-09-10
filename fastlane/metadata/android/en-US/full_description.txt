@@ -20,5 +20,6 @@ Supported hardware families:
 • iTiMO — SSID `iTiMO-XXXXXX` or `jetion_XXXX`.
 • JEGOAT — SSID `softish-XXXXXX`.
 • EarFairy — SSID `Cooleer_XXXXXX`.
+• NE3 — SSID `HNDEC_XXXXXX`.
 
 Otoscope is GPL-3.0-or-later and contains no third-party trackers, ad SDKs, or proprietary native libraries.
