@@ -1,0 +1,1 @@
+Adds support for NE3 otoscopes, sold with the HND companion app. The app picks them up from a Wi-Fi scan (any HNDEC_XXXXXX access point), streams live video and auto-rotates the image. LED and battery are not available on this hardware.

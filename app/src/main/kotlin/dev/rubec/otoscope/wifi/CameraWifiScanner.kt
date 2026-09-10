@@ -71,18 +71,27 @@ class CameraWifiScanner(context: Context) {
                 val ssid = result.ssidText().orEmpty()
                 if (ssid.isBlank()) continue
                 val bssid = result.BSSID ?: continue
+                // `capabilities` is the WifiManager-string representation of
+                // the AP's security + extras, e.g. `[WPA2-PSK-CCMP][ESS]` for
+                // WPA2-Personal and just `[ESS]` for an open AP. Load-bearing
+                // for diagnostics: a vendor that declares the wrong auth type
+                // in its specifier gets filtered out of Android's inner scan
+                // and the user sees a confusing "No devices found" dialog,
+                // so logging the real capabilities makes the next debug log
+                // decisive instead of circumstantial.
+                val caps = result.capabilities.orEmpty()
                 val advert = CameraVendors.parseSsid(ssid, bssid, result.level)
                 if (advert == null) {
                     // Log each non-matching SSID once per scan session so users
                     // can spot a typo / case-mismatch in the vendor's prefix
                     // (e.g. Cooleer_ vs cooleer_) without drowning the log.
                     if (loggedNonMatches.add(bssid)) {
-                        Log.d(TAG, "  seen (no match): ssid=$ssid bssid=$bssid rssi=${result.level}")
+                        Log.d(TAG, "  seen (no match): ssid=$ssid bssid=$bssid rssi=${result.level} caps=$caps")
                     }
                     continue
                 }
                 if (seenBssids.add(advert.bssid)) {
-                    Log.i(TAG, "  MATCH ${advert.vendor.displayName}: ssid=$ssid bssid=${advert.bssid} rssi=${result.level}")
+                    Log.i(TAG, "  MATCH ${advert.vendor.displayName}: ssid=$ssid bssid=${advert.bssid} rssi=${result.level} caps=$caps")
                     trySend(advert)
                 }
             }

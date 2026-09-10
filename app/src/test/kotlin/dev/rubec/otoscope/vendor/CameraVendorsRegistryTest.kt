@@ -27,6 +27,7 @@ class CameraVendorsRegistryTest {
         assertTrue(EarFairyVendor in CameraVendors.all)
         assertTrue(I4seasonVendor in CameraVendors.all)
         assertTrue(Y38Vendor in CameraVendors.all)
+        assertTrue(Ne3Vendor in CameraVendors.all)
 
         assertTrue(XyllaVendor in CameraVendors.bleVendors)
         assertTrue(ItimoVendor in CameraVendors.bleVendors)
@@ -34,7 +35,9 @@ class CameraVendorsRegistryTest {
         assertTrue(XyllaVendor !in CameraVendors.wifiScanVendors)
 
         assertTrue(EarFairyVendor in CameraVendors.wifiScanVendors)
+        assertTrue(Ne3Vendor in CameraVendors.wifiScanVendors)
         assertTrue(EarFairyVendor !in CameraVendors.bleVendors)
+        assertTrue(Ne3Vendor !in CameraVendors.bleVendors)
 
         assertTrue(I4seasonVendor in CameraVendors.wifiScanVendors)
         assertTrue(I4seasonVendor !in CameraVendors.bleVendors)
@@ -90,6 +93,12 @@ class CameraVendorsRegistryTest {
         val advert = CameraVendors.parseSsid("Cooleer_ABCDEF", "aa:bb:cc:dd:ee:ff", -30)
         assertNotNull(advert)
         assertSame(EarFairyVendor, advert.vendor)
+    }
+
+    @Test fun `Wi-Fi scan dispatch reaches NE3 on HNDEC_ SSIDs`() {
+        val advert = CameraVendors.parseSsid("HNDEC_55-ABC123", "aa:bb:cc:dd:ee:ff", -30)
+        assertNotNull(advert)
+        assertSame(Ne3Vendor, advert.vendor)
     }
 
     @Test fun `Wi-Fi scan dispatch reaches i4season on Soulear- SSIDs`() {
