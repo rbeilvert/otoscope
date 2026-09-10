@@ -88,6 +88,7 @@ object CameraVendors {
         EarFairyVendor,
         I4seasonVendor,
         Y38Vendor,
+        Ne3Vendor,
     )
 
     val bleVendors: List<CameraVendor> = all.filter { it.discoveryMode == DiscoveryMode.BLE }
