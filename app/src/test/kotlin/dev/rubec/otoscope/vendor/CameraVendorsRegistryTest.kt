@@ -25,6 +25,7 @@ class CameraVendorsRegistryTest {
         assertTrue(ItimoVendor in CameraVendors.all)
         assertTrue(JegoatVendor in CameraVendors.all)
         assertTrue(EarFairyVendor in CameraVendors.all)
+        assertTrue(Ne3Vendor in CameraVendors.all)
 
         assertTrue(XyllaVendor in CameraVendors.bleVendors)
         assertTrue(ItimoVendor in CameraVendors.bleVendors)
@@ -32,7 +33,9 @@ class CameraVendorsRegistryTest {
         assertTrue(XyllaVendor !in CameraVendors.wifiScanVendors)
 
         assertTrue(EarFairyVendor in CameraVendors.wifiScanVendors)
+        assertTrue(Ne3Vendor in CameraVendors.wifiScanVendors)
         assertTrue(EarFairyVendor !in CameraVendors.bleVendors)
+        assertTrue(Ne3Vendor !in CameraVendors.bleVendors)
     }
 
     @Test fun `iTiMO advert wins over Xylla even with matching 66-99 magic`() {
@@ -80,6 +83,12 @@ class CameraVendorsRegistryTest {
         val advert = CameraVendors.parseSsid("Cooleer_ABCDEF", "aa:bb:cc:dd:ee:ff", -30)
         assertNotNull(advert)
         assertSame(EarFairyVendor, advert.vendor)
+    }
+
+    @Test fun `Wi-Fi scan dispatch reaches NE3 on HNDEC_ SSIDs`() {
+        val advert = CameraVendors.parseSsid("HNDEC_55-ABC123", "aa:bb:cc:dd:ee:ff", -30)
+        assertNotNull(advert)
+        assertSame(Ne3Vendor, advert.vendor)
     }
 
     @Test fun `Wi-Fi scan dispatch returns null on non-camera SSIDs`() {

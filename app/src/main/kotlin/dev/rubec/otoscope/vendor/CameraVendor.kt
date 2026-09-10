@@ -81,7 +81,13 @@ enum class DiscoveryMode {
 object CameraVendors {
     // iTiMO is checked before Xylla because both share the `0x66 0x99` BLE
     // manufacturer magic; the SSID-name check on iTiMO would lose otherwise.
-    val all: List<CameraVendor> = listOf(ItimoVendor, XyllaVendor, JegoatVendor, EarFairyVendor)
+    val all: List<CameraVendor> = listOf(
+        ItimoVendor,
+        XyllaVendor,
+        JegoatVendor,
+        EarFairyVendor,
+        Ne3Vendor,
+    )
 
     val bleVendors: List<CameraVendor> = all.filter { it.discoveryMode == DiscoveryMode.BLE }
     val wifiScanVendors: List<CameraVendor> = all.filter { it.discoveryMode == DiscoveryMode.WIFI_SCAN }
