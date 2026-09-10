@@ -25,8 +25,8 @@ android {
         applicationId = "dev.rubec.otoscope"
         minSdk = 29
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.11.1"
+        versionCode = 16
+        versionName = "0.12.0"
 
         vectorDrawables { useSupportLibrary = true }
     }
