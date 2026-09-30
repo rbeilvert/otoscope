@@ -68,6 +68,17 @@ class I4seasonProtocolTest {
         assertNull(I4seasonProtocol.parseDevInfo(ByteArray(0x40)))
     }
 
+    @Test fun `LED write sets the write bit on the camera LED id`() {
+        assertContentEquals(byteArrayOf(0x11, 1, 100), I4seasonProtocol.ledWritePayload(on = true))
+        assertContentEquals(byteArrayOf(0x11, 0, 0), I4seasonProtocol.ledWritePayload(on = false))
+        assertContentEquals(byteArrayOf(0x01, 0, 0), I4seasonProtocol.ledReadPayload())
+    }
+
+    @Test fun `LED reply decodes status and brightness`() {
+        assertEquals(I4seasonProtocol.LedState(on = true, brightness = 40), I4seasonProtocol.parseLed(byteArrayOf(0x11, 1, 40)))
+        assertNull(I4seasonProtocol.parseLed(byteArrayOf(0x11, 1)))
+    }
+
     @Test fun `FBPRO products get the vendor's 180 degree mount offset`() {
         assertEquals(180f, I4seasonProtocol.mountOffsetDegrees("BK7231U-XRH-FBPRO"))
         assertEquals(0f, I4seasonProtocol.mountOffsetDegrees("BK7231U-XRH"))

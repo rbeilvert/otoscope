@@ -7,7 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added
-- Support for **Soulear** (i4season) otoscopes, tested with the _Hopefox Find T_. Like EarFairy they have no BLE component: the app lists any `Soulear-XXXXX` access point from a Wi-Fi scan. Live video, auto-rotation from the on-board accelerometer, and battery level.
+- Support for **Soulear** (i4season) otoscopes, tested with the _Hopefox Find T_. Like EarFairy they have no BLE component: the app lists any `Soulear-XXXXX` access point from a Wi-Fi scan. Live video, auto-rotation from the on-board accelerometer, battery level, and a ring-light on/off toggle.
 
 ## [0.7.0] — 2026-08-31
 

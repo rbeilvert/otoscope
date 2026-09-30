@@ -29,6 +29,12 @@ import kotlin.math.hypot
  *  - `0x0004` open video, to UDP/10006. Payload `u16 picPort, u16 audioPort, u32 clientId`.
  *    The camera then streams to `picPort` for a while; the vendor app re-sends
  *    it every second while no video arrives, which doubles as the keepalive.
+ *  - `0x000A` LED, to UDP/10005. Payload `u8 op, u8 status, u8 brightness`; `op`
+ *    is the LED id (1 = camera ring light) with `0x10` set for "write". The reply
+ *    carries the resulting state in the same layout. Status 0 = off, 1 = on
+ *    (2 = blink, 3 = breathe also exist). The camera stores and echoes any
+ *    brightness 0..100, but the Find T's LED doesn't dim, and the vendor app
+ *    only ever writes 100 or 0, so we do the same.
  */
 internal object I4seasonProtocol {
     const val MAGIC = 0xFFEEFFEE.toInt()
@@ -40,6 +46,10 @@ internal object I4seasonProtocol {
     const val CMD_DEVINFO = 0x0001
     const val CMD_LICGET = 0x0002
     const val CMD_OPEN_VIDEO = 0x0004
+    const val CMD_LED = 0x000A
+
+    private const val LED_CAMERA = 1
+    private const val LED_WRITE = 0x10
 
     private const val DEVINFO_SIZE = 0x80
 
@@ -60,6 +70,18 @@ internal object I4seasonProtocol {
             .putShort(0) // no audio
             .putInt(clientId)
             .array()
+
+    fun ledReadPayload(): ByteArray = byteArrayOf(LED_CAMERA.toByte(), 0, 0)
+
+    fun ledWritePayload(on: Boolean): ByteArray =
+        byteArrayOf((LED_WRITE or LED_CAMERA).toByte(), if (on) 1 else 0, if (on) 100 else 0)
+
+    data class LedState(val on: Boolean, val brightness: Int)
+
+    fun parseLed(payload: ByteArray): LedState? {
+        if (payload.size < 3) return null
+        return LedState(on = payload[1].toInt() != 0, brightness = payload[2].toInt() and 0xff)
+    }
 
     class Reply(val seq: Int, val cmd: Int, val status: Int, val payload: ByteArray)
 

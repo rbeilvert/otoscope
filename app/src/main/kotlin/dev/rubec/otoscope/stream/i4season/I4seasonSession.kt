@@ -7,6 +7,7 @@ import dev.rubec.otoscope.debug.FileLog as Log
 import dev.rubec.otoscope.stream.BatteryStatus
 import dev.rubec.otoscope.stream.CameraSession
 import dev.rubec.otoscope.stream.JpegDecoder
+import dev.rubec.otoscope.stream.LedControl
 import dev.rubec.otoscope.stream.SessionStats
 import dev.rubec.otoscope.stream.bindOrTerminal
 import dev.rubec.otoscope.stream.toHex
@@ -21,9 +22,12 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -41,6 +45,8 @@ import java.net.SocketTimeoutException
  *  - **Video**: JPEG chunks pushed by the camera to the port we announced.
  *    Reassembly is in [FrameAssembler]; each frame carries an accelerometer
  *    sample that drives [rotation].
+ *
+ * The ring light is switched and dimmed over the control channel (see [led]).
  */
 class I4seasonSession(
     private val cameraIp: String,
@@ -68,7 +74,26 @@ class I4seasonSession(
     private val _terminalError = MutableStateFlow<String?>(null)
     override val terminalError: StateFlow<String?> = _terminalError.asStateFlow()
 
+    // Like the vendor app, we switch the light on at connect time.
+    private val _ledEnabled = MutableStateFlow(true)
+
+    /** Latest requested light state. A StateFlow so quick toggling collapses
+     *  into one command for the final state. */
+    private val ledRequest = MutableStateFlow<Boolean?>(null)
+
+    override val led: LedControl = object : LedControl {
+        override val enabled: StateFlow<Boolean> get() = _ledEnabled
+        override fun setEnabled(on: Boolean) {
+            _ledEnabled.value = on
+            ledRequest.value = on
+        }
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** Serialises control requests: the control loop and LED commands share
+     *  one socket and one sequence counter. */
+    private val requestLock = Mutex()
     private var videoSocket: DatagramSocket? = null
     private var controlSocket: DatagramSocket? = null
     private var cameraAddr: InetAddress? = null
@@ -133,6 +158,14 @@ class I4seasonSession(
         // camera doesn't seem to care, but mirroring the sequence is cheap.
         request(sock, I4seasonProtocol.CMD_LICGET, port = I4seasonProtocol.CMD_PORT, attempts = 3)
 
+        request(sock, I4seasonProtocol.CMD_LED, I4seasonProtocol.ledReadPayload(), I4seasonProtocol.CMD_PORT)
+            ?.let { I4seasonProtocol.parseLed(it.payload) }
+            ?.let { Log.i(TAG, "led at connect: $it") }
+        led.setEnabled(true)
+        scope.launch {
+            ledRequest.filterNotNull().collect { wanted -> sendLed(sock, wanted) }
+        }
+
         val openVideo = I4seasonProtocol.openVideoPayload(picPort, clientId)
         var lastOpen = 0L
         var lastDevInfo = SystemClock.elapsedRealtime()
@@ -151,7 +184,14 @@ class I4seasonSession(
         }
     }
 
-    private fun queryDevInfo(sock: DatagramSocket) {
+    private suspend fun sendLed(sock: DatagramSocket, on: Boolean) {
+        val payload = I4seasonProtocol.ledWritePayload(on)
+        val reply = request(sock, I4seasonProtocol.CMD_LED, payload, I4seasonProtocol.CMD_PORT)
+        val state = reply?.let { I4seasonProtocol.parseLed(it.payload) }
+        Log.i(TAG, "led set on=$on -> ${reply?.let { "status=${it.status} state=$state" } ?: "no reply"}")
+    }
+
+    private suspend fun queryDevInfo(sock: DatagramSocket) {
         val reply = request(sock, I4seasonProtocol.CMD_DEVINFO, port = I4seasonProtocol.CMD_PORT) ?: return
         val info = I4seasonProtocol.parseDevInfo(reply.payload) ?: return
         if (_model.value == null) Log.i(TAG, "devinfo: $info")
@@ -179,13 +219,23 @@ class I4seasonSession(
     }
 
     /** Send one command and wait for the reply with the matching sequence
-     *  number. Blocking; only called from the control coroutine. */
-    private fun request(
+     *  number. Blocks the calling IO thread while holding [requestLock]. */
+    private suspend fun request(
         sock: DatagramSocket,
         cmd: Int,
         payload: ByteArray = ByteArray(0),
         port: Int,
         attempts: Int = REQUEST_ATTEMPTS,
+    ): I4seasonProtocol.Reply? = requestLock.withLock {
+        requestLocked(sock, cmd, payload, port, attempts)
+    }
+
+    private fun requestLocked(
+        sock: DatagramSocket,
+        cmd: Int,
+        payload: ByteArray,
+        port: Int,
+        attempts: Int,
     ): I4seasonProtocol.Reply? {
         val addr = cameraAddr ?: return null
         val mySeq = seq

@@ -65,7 +65,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 | Battery + model readout    | ✅ where the camera exposes it           |
 | Photo / video capture      | ✅ JPEG stills and H.264 MP4 clips        |
 | Capture gallery            | ✅ in-app review, share and delete       |
-| Brightness control    | 🚧 On-Off implemented for EarFairy      |
+| Brightness control    | 🚧 On-Off implemented for EarFairy, Soulear |
 
 ## License
 
