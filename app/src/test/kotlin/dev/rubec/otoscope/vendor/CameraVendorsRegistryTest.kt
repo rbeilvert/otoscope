@@ -33,6 +33,10 @@ class CameraVendorsRegistryTest {
 
         assertTrue(EarFairyVendor in CameraVendors.wifiScanVendors)
         assertTrue(EarFairyVendor !in CameraVendors.bleVendors)
+
+        assertTrue(I4seasonVendor in CameraVendors.all)
+        assertTrue(I4seasonVendor in CameraVendors.wifiScanVendors)
+        assertTrue(I4seasonVendor !in CameraVendors.bleVendors)
     }
 
     @Test fun `iTiMO advert wins over Xylla even with matching 66-99 magic`() {
@@ -80,6 +84,13 @@ class CameraVendorsRegistryTest {
         val advert = CameraVendors.parseSsid("Cooleer_ABCDEF", "aa:bb:cc:dd:ee:ff", -30)
         assertNotNull(advert)
         assertSame(EarFairyVendor, advert.vendor)
+    }
+
+    @Test fun `Wi-Fi scan dispatch reaches i4season on Soulear- SSIDs`() {
+        val advert = CameraVendors.parseSsid("Soulear-318eb", "c6:25:9e:18:6e:b0", -30)
+        assertNotNull(advert)
+        assertSame(I4seasonVendor, advert.vendor)
+        assertNull(advert.wpa2Passphrase)
     }
 
     @Test fun `Wi-Fi scan dispatch returns null on non-camera SSIDs`() {
