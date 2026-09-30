@@ -73,14 +73,18 @@ class CaptureController(context: Context, private val scope: CoroutineScope) {
     val events: SharedFlow<CaptureEvent> = _events
 
     private var session: CameraSession? = null
+    private var rotation: StateFlow<Float>? = null
     private var recordJob: Job? = null
 
     /** Bumped on every [startRecording] so a clip that is still muxing can tell
      *  whether it is still the current one before touching shared state. */
     private var recordGeneration = 0
 
-    fun attach(session: CameraSession) {
+    /** [rotation] is what the preview shows: the session's angle, or 0 when
+     *  the user turned auto-rotation off. Captures follow the preview. */
+    fun attach(session: CameraSession, rotation: StateFlow<Float> = session.rotation) {
         this.session = session
+        this.rotation = rotation
     }
 
     /** Called when the stream goes away for any reason. Stops (and keeps) an
@@ -88,6 +92,7 @@ class CaptureController(context: Context, private val scope: CoroutineScope) {
     fun detach() {
         stopRecording()
         session = null
+        rotation = null
     }
 
     fun setOverlayText(text: String) {
@@ -106,7 +111,7 @@ class CaptureController(context: Context, private val scope: CoroutineScope) {
             return
         }
         if (_savingPhoto.value) return
-        val rotation = source.rotation.value
+        val rotation = (this.rotation ?: source.rotation).value
         val overlay = _overlayText.value
         _savingPhoto.value = true
         scope.launch(Dispatchers.Default) {
@@ -169,6 +174,7 @@ class CaptureController(context: Context, private val scope: CoroutineScope) {
             // it from its own thread into a conflated channel instead: a device
             // that can't keep up drops recorded frames and leaves the preview
             // alone. (flowOn is a no-op on a SharedFlow, hence the channel.)
+            val rotation = this@CaptureController.rotation ?: source.rotation
             val queue = Channel<Bitmap>(Channel.CONFLATED)
             val pump = launch(Dispatchers.Default) {
                 source.frames.collect { queue.trySend(it) }
@@ -189,7 +195,7 @@ class CaptureController(context: Context, private val scope: CoroutineScope) {
                     }
                     val composed = FrameComposer.compose(
                         frame = frame,
-                        rotationDegrees = source.rotation.value,
+                        rotationDegrees = rotation.value,
                         overlay = _overlayText.value,
                         side = active.side,
                     )

@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
@@ -50,6 +51,7 @@ sealed interface CameraState {
         val battery: StateFlow<BatteryStatus?>,
         val diagnostics: StateFlow<Map<String, String>>,
         val flipEnabled: StateFlow<Boolean>,
+        val autoRotateEnabled: StateFlow<Boolean>,
     ) : CameraState
     data class Error(val message: String) : CameraState
 
@@ -81,6 +83,10 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     /** Horizontal-mirror state for the active stream. Owned here so the UI
      *  reads it read-only and routes toggles back through [setFlipEnabled]. */
     private val flipEnabled = MutableStateFlow(true)
+
+    /** Accelerometer-driven auto-rotation. Off shows (and saves) the image as
+     *  the camera sends it. Kept across sessions within the app's lifetime. */
+    private val autoRotateEnabled = MutableStateFlow(true)
 
     fun startScan(mode: DiscoveryMode) {
         // Both modes need Wi-Fi enabled; BLE additionally needs Bluetooth on.
@@ -195,7 +201,9 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         )
         flipEnabled.value = true
         session.start()
-        capture.attach(session)
+        val rotation = combine(session.rotation, autoRotateEnabled) { degrees, auto -> if (auto) degrees else 0f }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = 0f)
+        capture.attach(session, rotation)
 
         val frameState = session.frames
             .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null as Bitmap?)
@@ -204,11 +212,12 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             advert = advert,
             session = session,
             frame = frameState,
-            rotation = session.rotation,
+            rotation = rotation,
             model = session.model,
             battery = session.battery,
             diagnostics = session.diagnostics,
             flipEnabled = flipEnabled.asStateFlow(),
+            autoRotateEnabled = autoRotateEnabled.asStateFlow(),
         )
 
         // React to the camera's WiFi AP disappearing (typical when the user
@@ -345,6 +354,10 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setFlipEnabled(enabled: Boolean) {
         flipEnabled.value = enabled
+    }
+
+    fun setAutoRotateEnabled(enabled: Boolean) {
+        autoRotateEnabled.value = enabled
     }
 
     fun disconnect() {

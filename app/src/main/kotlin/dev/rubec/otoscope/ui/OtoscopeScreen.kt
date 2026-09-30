@@ -1,6 +1,11 @@
 package dev.rubec.otoscope.ui
 
+import android.app.Activity
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,10 +31,16 @@ import androidx.compose.material.icons.filled.Battery6Bar
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PowerOff
+import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.outlined.Videocam
@@ -41,6 +52,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Switch
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -58,10 +71,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.rubec.otoscope.BuildConfig
 import dev.rubec.otoscope.ble.CameraAdvert
@@ -87,11 +104,15 @@ fun OtoscopeScreen(
     onConnect: (CameraAdvert) -> Unit,
     onDisconnect: () -> Unit,
     onSetFlip: (Boolean) -> Unit,
+    onSetAutoRotate: (Boolean) -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     val savedMedia by capture.media.collectAsStateWithLifecycle()
     var showGallery by remember { mutableStateOf(false) }
+    var fullscreen by rememberSaveable { mutableStateOf(false) }
+    // Leave fullscreen whenever the stream goes away (disconnect, camera off).
+    if (state !is CameraState.Streaming && fullscreen) fullscreen = false
 
     // One listing on first composition, then the controller refreshes itself
     // after every save and delete.
@@ -134,6 +155,8 @@ fun OtoscopeScreen(
                     state = state,
                     capture = capture,
                     onSetFlip = onSetFlip,
+                    onSetAutoRotate = onSetAutoRotate,
+                    onEnterFullscreen = { fullscreen = true },
                     onOpenGallery = {
                         // The caption field's text-selection handles are drawn
                         // in their own window, which the gallery can't cover —
@@ -163,6 +186,17 @@ fun OtoscopeScreen(
                 )
             }
         }
+    }
+
+    // Outside the Scaffold for the same reason as the gallery below: it covers
+    // the top bar too.
+    if (fullscreen && state is CameraState.Streaming) {
+        val overlayText by capture.overlayText.collectAsStateWithLifecycle()
+        FullscreenCameraView(
+            state = state,
+            overlayText = overlayText,
+            onExit = { fullscreen = false },
+        )
     }
 
     // Outside the Scaffold on purpose: the gallery takes over the whole window,
@@ -490,14 +524,18 @@ private fun StreamingView(
     state: CameraState.Streaming,
     capture: CaptureController,
     onSetFlip: (Boolean) -> Unit,
+    onSetAutoRotate: (Boolean) -> Unit,
+    onEnterFullscreen: () -> Unit,
     onOpenGallery: () -> Unit,
 ) {
+    var optionsExpanded by rememberSaveable { mutableStateOf(false) }
     val frame by state.frame.collectAsStateWithLifecycle()
     val rotation by state.rotation.collectAsStateWithLifecycle()
     val model by state.model.collectAsStateWithLifecycle()
     val battery by state.battery.collectAsStateWithLifecycle()
     val diagnostics by state.diagnostics.collectAsStateWithLifecycle()
     val flipEnabled by state.flipEnabled.collectAsStateWithLifecycle()
+    val autoRotate by state.autoRotateEnabled.collectAsStateWithLifecycle()
 
     val overlayText by capture.overlayText.collectAsStateWithLifecycle()
     val recording by capture.recording.collectAsStateWithLifecycle()
@@ -535,48 +573,68 @@ private fun StreamingView(
                     flipEnabled = flipEnabled,
                     overlayText = overlayText,
                 )
+                IconButton(
+                    onClick = onEnterFullscreen,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                ) {
+                    Icon(Icons.Default.Fullscreen, contentDescription = "Fullscreen")
+                }
             }
 
             CameraStatus(modelName = model, ssid = state.advert.ssid, battery = battery)
 
-            // Ring-light control, shown only for vendors that expose it
-            // (currently EarFairy). Local echo is instant; the camera doesn't
-            // acknowledge but the LED responds within a video frame or two.
-            state.session.led?.let { led ->
-                val ledOn by led.enabled.collectAsStateWithLifecycle()
-                LabeledSwitch(
-                    icon = Icons.Default.Lightbulb,
-                    title = "Ring light",
-                    subtitle = "Toggle the LEDs around the otoscope tip.",
-                    checked = ledOn,
-                    onCheckedChange = { led.setEnabled(it) },
-                )
-            }
+            // Folded away by default so the image keeps most of the screen.
+            OptionsHeader(expanded = optionsExpanded, onToggle = { optionsExpanded = !optionsExpanded })
+            AnimatedVisibility(visible = optionsExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Ring-light control, shown only for vendors that expose it.
+                    // Local echo is instant; the LED responds within a video
+                    // frame or two.
+                    state.session.led?.let { led ->
+                        val ledOn by led.enabled.collectAsStateWithLifecycle()
+                        LabeledSwitch(
+                            icon = Icons.Default.Lightbulb,
+                            title = "Ring light",
+                            subtitle = "Toggle the LEDs around the otoscope tip.",
+                            checked = ledOn,
+                            onCheckedChange = { led.setEnabled(it) },
+                        )
+                    }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Mirror view",
-                        style = MaterialTheme.typography.bodyMedium,
+                    LabeledSwitch(
+                        icon = Icons.Default.ScreenRotation,
+                        title = "Auto-rotate",
+                        subtitle = "Keep the image upright using the otoscope's motion sensor.",
+                        checked = autoRotate,
+                        onCheckedChange = onSetAutoRotate,
                     )
-                    Text(
-                        "Check to examine yourself, uncheck to examine someone else. " +
-                            "Saved photos and clips are never mirrored.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Mirror view",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                "Check to examine yourself, uncheck to examine someone else. " +
+                                    "Saved photos and clips are never mirrored.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Checkbox(
+                            checked = flipEnabled,
+                            onCheckedChange = onSetFlip,
+                        )
+                    }
+
+                    if (BuildConfig.DEBUG && diagnostics.isNotEmpty()) {
+                        DiagnosticsOverlay(diagnostics)
+                    }
                 }
-                Checkbox(
-                    checked = flipEnabled,
-                    onCheckedChange = onSetFlip,
-                )
-            }
-
-            if (BuildConfig.DEBUG && diagnostics.isNotEmpty()) {
-                DiagnosticsOverlay(diagnostics)
             }
         }
 
@@ -599,6 +657,72 @@ private fun StreamingView(
             },
             onOpenGallery = onOpenGallery,
         )
+    }
+}
+
+@Composable
+private fun OptionsHeader(expanded: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Default.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.size(12.dp))
+        Text("Options", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Icon(
+            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = if (expanded) "Hide options" else "Show options",
+        )
+    }
+}
+
+/**
+ * The camera image alone on black, with the system bars hidden. The stream
+ * view stays composed underneath, so the session, the screen-on flag and any
+ * running recording carry on untouched. Back or the exit button return.
+ */
+@Composable
+private fun FullscreenCameraView(
+    state: CameraState.Streaming,
+    overlayText: String,
+    onExit: () -> Unit,
+) {
+    val frame by state.frame.collectAsStateWithLifecycle()
+    val rotation by state.rotation.collectAsStateWithLifecycle()
+    val flipEnabled by state.flipEnabled.collectAsStateWithLifecycle()
+
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = (view.context as? Activity)?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller?.hide(WindowInsetsCompat.Type.systemBars())
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+    BackHandler(onBack = onExit)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            // Swallow touches so nothing underneath reacts.
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+        contentAlignment = Alignment.Center,
+    ) {
+        CameraFrame(
+            frame = frame,
+            rotationDegrees = rotation,
+            flipEnabled = flipEnabled,
+            overlayText = overlayText,
+            modifier = Modifier.fillMaxSize(),
+        )
+        IconButton(
+            onClick = onExit,
+            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+            colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White),
+        ) {
+            Icon(Icons.Default.FullscreenExit, contentDescription = "Exit fullscreen")
+        }
     }
 }
 

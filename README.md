@@ -15,7 +15,8 @@ Otoscope is a reverse-engineered drop-in replacement for the proprietary compani
 - Joins the camera's Wi-Fi access point in an isolated, process-bound network. No impact on your saved Wi-Fi config.
 - Streams live video over the camera's native protocol — UDP or RTSP MJPEG — decoded in pure Kotlin. No proprietary `.so`, no FFmpeg dependency.
 - Auto-rotates the image using the camera's on-board accelerometer / gyro, clipped to a circular mask matching the otoscope lens.
-- Horizontal-mirror toggle for self-examination.
+- Horizontal-mirror toggle for self-examination, and a switch to turn auto-rotation off.
+- Fullscreen view of the camera image; the stream options fold away so the image keeps most of the screen.
 - Ring-light on/off toggle and charging indicator on models that expose them.
 - Photo and video capture, written straight to `Pictures/Otoscope` and `Movies/Otoscope`, with an in-app gallery to review, share and delete them.
 - Optional free-text caption (e.g. "Left ear") burnt into the corner of every capture.

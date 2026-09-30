@@ -104,6 +104,7 @@ class MainActivity : ComponentActivity() {
                         onConnect = vm::connect,
                         onDisconnect = vm::disconnect,
                         onSetFlip = vm::setFlipEnabled,
+                        onSetAutoRotate = vm::setAutoRotateEnabled,
                     )
                 }
             }
