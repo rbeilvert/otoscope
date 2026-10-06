@@ -88,6 +88,11 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
      *  the camera sends it. Kept across sessions within the app's lifetime. */
     private val autoRotateEnabled = MutableStateFlow(true)
 
+    /** Extra rotation the user applied manually via the rotate button, in
+     *  degrees. Only meaningful while auto-rotate is off; reset at every new
+     *  session so a reconnect starts flat. */
+    private val manualRotation = MutableStateFlow(0f)
+
     fun startScan(mode: DiscoveryMode) {
         // Both modes need Wi-Fi enabled; BLE additionally needs Bluetooth on.
         if (mode == DiscoveryMode.BLE && !bleScanner.isBluetoothEnabled) {
@@ -200,9 +205,11 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             cameraIp = cameraIp,
         )
         flipEnabled.value = true
+        manualRotation.value = 0f
         session.start()
-        val rotation = combine(session.rotation, autoRotateEnabled) { degrees, auto -> if (auto) degrees else 0f }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = 0f)
+        val rotation = combine(session.rotation, autoRotateEnabled, manualRotation) { degrees, auto, manual ->
+            if (auto) degrees else manual
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = 0f)
         capture.attach(session, rotation)
 
         val frameState = session.frames
@@ -358,6 +365,21 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAutoRotateEnabled(enabled: Boolean) {
         autoRotateEnabled.value = enabled
+        // Fresh manual pose on every flip, so the user doesn't inherit a 270°
+        // offset from the last time they played with the rotate button.
+        if (enabled) manualRotation.value = 0f
+    }
+
+    /** Rotate the manual pose by 90° counter-clockwise, visually. [CameraFrame]
+     *  negates the applied `rotationZ` when the mirror is on (so the sensor
+     *  rotation reads the same way physically either way), which also flips
+     *  the sign the user would see for a manual tap — so compensate here.
+     *  Normalised to [0, 360) to keep the stored value bounded regardless
+     *  of how many times the user taps. No-op while auto-rotate is on — the
+     *  UI only exposes the rotate button in the off state. */
+    fun rotateManuallyCcw90() {
+        val delta = if (flipEnabled.value) 90f else -90f
+        manualRotation.update { current -> (current + delta + 360f) % 360f }
     }
 
     fun disconnect() {

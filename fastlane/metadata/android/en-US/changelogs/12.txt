@@ -1,0 +1,1 @@
+Adds a fullscreen view and an auto-rotate toggle. When auto-rotate is off, a rotate button next to the fullscreen one turns the image 90° at a time. Ring-light, mirror and auto-rotate now fold away under an "Options" row to keep the camera image as large as possible.

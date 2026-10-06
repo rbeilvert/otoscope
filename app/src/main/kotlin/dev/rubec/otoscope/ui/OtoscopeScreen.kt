@@ -33,11 +33,13 @@ import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PowerOff
+import androidx.compose.material.icons.filled.Rotate90DegreesCcw
 import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
@@ -47,7 +49,6 @@ import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Switch
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -105,6 +106,7 @@ fun OtoscopeScreen(
     onDisconnect: () -> Unit,
     onSetFlip: (Boolean) -> Unit,
     onSetAutoRotate: (Boolean) -> Unit,
+    onRotateCcw: () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -156,6 +158,7 @@ fun OtoscopeScreen(
                     capture = capture,
                     onSetFlip = onSetFlip,
                     onSetAutoRotate = onSetAutoRotate,
+                    onRotateCcw = onRotateCcw,
                     onEnterFullscreen = { fullscreen = true },
                     onOpenGallery = {
                         // The caption field's text-selection handles are drawn
@@ -195,6 +198,7 @@ fun OtoscopeScreen(
         FullscreenCameraView(
             state = state,
             overlayText = overlayText,
+            onRotateCcw = onRotateCcw,
             onExit = { fullscreen = false },
         )
     }
@@ -525,6 +529,7 @@ private fun StreamingView(
     capture: CaptureController,
     onSetFlip: (Boolean) -> Unit,
     onSetAutoRotate: (Boolean) -> Unit,
+    onRotateCcw: () -> Unit,
     onEnterFullscreen: () -> Unit,
     onOpenGallery: () -> Unit,
 ) {
@@ -571,13 +576,23 @@ private fun StreamingView(
                     frame = frame,
                     rotationDegrees = rotation,
                     flipEnabled = flipEnabled,
+                    circularMask = autoRotate,
                     overlayText = overlayText,
                 )
-                IconButton(
-                    onClick = onEnterFullscreen,
+                Row(
                     modifier = Modifier.align(Alignment.TopEnd),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Default.Fullscreen, contentDescription = "Fullscreen")
+                    // Only useful when the sensor-driven rotation is off,
+                    // otherwise the user's -90° would be overridden next frame.
+                    if (!autoRotate) {
+                        IconButton(onClick = onRotateCcw) {
+                            Icon(Icons.Default.Rotate90DegreesCcw, contentDescription = "Rotate 90° counter-clockwise")
+                        }
+                    }
+                    IconButton(onClick = onEnterFullscreen) {
+                        Icon(Icons.Default.Fullscreen, contentDescription = "Fullscreen")
+                    }
                 }
             }
 
@@ -602,34 +617,20 @@ private fun StreamingView(
                     }
 
                     LabeledSwitch(
+                        icon = Icons.Default.Flip,
+                        title = "Mirror",
+                        subtitle = "Mirror the view for easier self-exams.",
+                        checked = flipEnabled,
+                        onCheckedChange = onSetFlip,
+                    )
+
+                    LabeledSwitch(
                         icon = Icons.Default.ScreenRotation,
                         title = "Auto-rotate",
                         subtitle = "Keep the image upright using the otoscope's motion sensor.",
                         checked = autoRotate,
                         onCheckedChange = onSetAutoRotate,
                     )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Mirror view",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Text(
-                                "Check to examine yourself, uncheck to examine someone else. " +
-                                    "Saved photos and clips are never mirrored.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Checkbox(
-                            checked = flipEnabled,
-                            onCheckedChange = onSetFlip,
-                        )
-                    }
 
                     if (BuildConfig.DEBUG && diagnostics.isNotEmpty()) {
                         DiagnosticsOverlay(diagnostics)
@@ -685,11 +686,13 @@ private fun OptionsHeader(expanded: Boolean, onToggle: () -> Unit) {
 private fun FullscreenCameraView(
     state: CameraState.Streaming,
     overlayText: String,
+    onRotateCcw: () -> Unit,
     onExit: () -> Unit,
 ) {
     val frame by state.frame.collectAsStateWithLifecycle()
     val rotation by state.rotation.collectAsStateWithLifecycle()
     val flipEnabled by state.flipEnabled.collectAsStateWithLifecycle()
+    val autoRotate by state.autoRotateEnabled.collectAsStateWithLifecycle()
 
     val view = LocalView.current
     DisposableEffect(view) {
@@ -713,15 +716,28 @@ private fun FullscreenCameraView(
             frame = frame,
             rotationDegrees = rotation,
             flipEnabled = flipEnabled,
+            circularMask = autoRotate,
             overlayText = overlayText,
             modifier = Modifier.fillMaxSize(),
         )
-        IconButton(
-            onClick = onExit,
+        Row(
             modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
-            colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.FullscreenExit, contentDescription = "Exit fullscreen")
+            if (!autoRotate) {
+                IconButton(
+                    onClick = onRotateCcw,
+                    colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White),
+                ) {
+                    Icon(Icons.Default.Rotate90DegreesCcw, contentDescription = "Rotate 90° counter-clockwise")
+                }
+            }
+            IconButton(
+                onClick = onExit,
+                colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White),
+            ) {
+                Icon(Icons.Default.FullscreenExit, contentDescription = "Exit fullscreen")
+            }
         }
     }
 }

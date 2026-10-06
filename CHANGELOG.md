@@ -4,6 +4,17 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-10-06
+
+### Added
+- **Fullscreen stream view.** A button on the camera image shows it alone on black with the system bars hidden. Back or the exit button return; the session and any running recording carry on underneath.
+- **Auto-rotate toggle** in the options. When off, the image stops being rotation-compensated by the on-board accelerometer and the circular mask drops away so you see the full sensor square. Saved photos and clips match whatever the preview shows.
+- **Manual rotate button** next to the fullscreen one, shown only when auto-rotate is off. Each tap turns the image 90° counter-clockwise; the pose resets on reconnect or when auto-rotate is turned back on. Saved photos and clips honour it.
+
+### Changed
+- The ring-light, mirror and auto-rotate controls are now folded away under an "Options" row (collapsed by default), so the camera image keeps most of the screen.
+- The mirror toggle moved above auto-rotate and uses the same switch style as the other options, with a flip icon and a shorter label.
+
 ## [0.8.0] — 2026-10-05
 
 ### Added

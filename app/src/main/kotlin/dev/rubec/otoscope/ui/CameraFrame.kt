@@ -30,7 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import dev.rubec.otoscope.capture.CaptureGeometry
 
 /**
- * Renders the latest camera frame inside a circular mask.
+ * Renders the latest camera frame inside a circular mask (when
+ * [circularMask] is true, which is the usual case while auto-rotation is on).
  *
  * Two transformations live here:
  *  - **Horizontal mirror**. When [flipEnabled] is true the image is flipped
@@ -46,6 +47,11 @@ import dev.rubec.otoscope.capture.CaptureGeometry
  *  produced a visibly smoother image; the accelerometer already gives us a
  *  stable stream at ~20 Hz, and any extra filter only adds perceivable lag.
  *
+ *  The circular mask exists only to hide the corners of the rotated frame.
+ *  With auto-rotation off, those corners stop sweeping into view and the mask
+ *  becomes dead black pixels around a square image. Set [circularMask] to
+ *  false in that mode so the full frame reaches the user.
+ *
  *  [overlayText] previews the caption that [dev.rubec.otoscope.capture.FrameComposer]
  *  burns into saved captures. Its placement comes from the same
  *  [CaptureGeometry.caption] the burn-in uses, but it's drawn *outside* both the
@@ -57,6 +63,7 @@ fun CameraFrame(
     modifier: Modifier = Modifier,
     rotationDegrees: Float = 0f,
     flipEnabled: Boolean = true,
+    circularMask: Boolean = true,
     overlayText: String = "",
 ) {
     // Only changes when the frame is laid out, not per video frame.
@@ -76,7 +83,7 @@ fun CameraFrame(
                     .fillMaxSize()
                     // Clip here rather than on the parent: the mask belongs to
                     // the image, and the caption below has to escape it.
-                    .clip(CircleShape)
+                    .then(if (circularMask) Modifier.clip(CircleShape) else Modifier)
                     .graphicsLayer {
                         scaleX = if (flipEnabled) -1f else 1f
                         rotationZ = if (flipEnabled) -rotationDegrees else rotationDegrees
