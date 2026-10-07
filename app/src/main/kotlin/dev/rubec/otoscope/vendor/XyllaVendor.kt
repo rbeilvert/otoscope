@@ -7,12 +7,17 @@ import dev.rubec.otoscope.stream.CameraSession
 import dev.rubec.otoscope.stream.xylla.XyllaSession
 
 /**
- * Cameras advertising as `Enjoy-XXXXXX`, `JesHome-XXXX`, and similar.
+ * Original Xylla otoscope family, advertising as `Enjoy-XXXXXX` or
+ * `JesHome-XXXX` and paired with the "AIR-Look" vendor app.
  *
  * BLE advert: manufacturer-specific data (type 0xFF) starting with the magic
  * bytes `0x66 0x99` (not a Bluetooth-SIG company ID — used in place of one)
  * followed by a 6-byte WiFi BSSID. SSID is the BLE device name. The AP is
  * open (no passphrase) and always advertised; no BLE GATT handshake required.
+ *
+ * The same wire protocol is also used by newer Wi-Fi-only hardware (the Y38,
+ * which doesn't broadcast a BLE advert at all) — those devices live under
+ * [Y38Vendor] on the Wi-Fi-scan card and share [XyllaSession] under the hood.
  */
 object XyllaVendor : CameraVendor {
     override val displayName = "Xylla"

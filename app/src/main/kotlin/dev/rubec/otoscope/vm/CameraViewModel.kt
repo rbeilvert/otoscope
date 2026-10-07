@@ -56,7 +56,7 @@ sealed interface CameraState {
     data class Error(val message: String) : CameraState
 
     /** Camera dropped mid-session (powered off, out of range). Shown briefly
-     *  then auto-transitions back to [Idle] — no user action required. */
+     *  then auto-transitions back to [Idle], no user action required. */
     data class Disconnected(val reason: String) : CameraState
 }
 
@@ -146,18 +146,23 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         stopScan()
         _state.value = CameraState.Connecting(advert, attempt = 1, totalAttempts = CONNECT_ATTEMPTS)
         viewModelScope.launch {
-            // Fast path for Wi-Fi-scan vendors when the user is already joined
-            // to the camera network via Android settings. No specifier prompt,
-            // no join-retry loop; we just adopt the active Network handle.
-            if (advert.vendor.discoveryMode == DiscoveryMode.WIFI_SCAN &&
-                wifi.adoptCurrentIfMatches(advert) != null
-            ) {
+            // Fast path when the user is already joined to the camera network
+            // via Android settings. No specifier prompt, no join-retry loop;
+            // we just adopt the active Network handle. Any vendor qualifies.
+            if (wifi.adoptCurrentIfMatches(advert) != null) {
                 Log.i(TAG, "connect: adopted existing connection to ${advert.ssid}")
+                // Re-run the pre-Wi-Fi handshake anyway: JEGOAT firmware arms
+                // its video port as a side-effect of the BLE GATT knock, and
+                // skipping it can leave an adopted connection streaming zero
+                // frames. It is a no-op for the other vendors, failures are logged
+                // and we stream anyway.
+                runCatching { advert.vendor.preWifiHandshake(getApplication(), advert) }
+                    .onFailure { Log.w(TAG, "adopted-connection handshake failed, continuing: ${it.message}") }
                 startStreaming(advert)
                 return@launch
             }
 
-            // Pairing is occasionally flaky on the first try — the BLE knock can
+            // Pairing is occasionally flaky on the first try; the BLE knock can
             // return before the camera's AP is fully advertised, or the
             // WifiNetworkSpecifier request can time out on a slow boot. Retry
             // with a short backoff before surfacing an error.

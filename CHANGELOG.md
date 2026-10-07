@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-10-07
+
+### Added
+- Support for the **Y38** otoscope, a Wi-Fi-only sibling of the Xylla family that broadcasts `AIR-ES-XXXXXX` and never emits a BLE advert. Listed on the "Connect via Wi-Fi" card under its own brand. The wire protocol is the same `0x66 0x99` UDP/8032 MJPEG stream, reusing the Xylla session code unchanged.
+
 ## [0.9.0] — 2026-10-06
 
 ### Added

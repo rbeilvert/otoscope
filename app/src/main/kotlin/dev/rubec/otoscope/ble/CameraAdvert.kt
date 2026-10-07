@@ -3,9 +3,11 @@ package dev.rubec.otoscope.ble
 import dev.rubec.otoscope.vendor.CameraVendor
 
 /**
- * A camera discovered over BLE. The vendor-specific advert format (e.g. Xylla's
- * `0x66 0x99` magic vs JEGOAT's `0x270F` company ID) is hidden behind [vendor],
- * which the rest of the app consults when it needs to dispatch on hardware.
+ * A camera discovered during a scan. The vendor-specific advert format (e.g.
+ * Xylla's `0x66 0x99` magic vs JEGOAT's `0x270F` company ID) is hidden behind
+ * [vendor], which the rest of the app consults when it needs to dispatch on
+ * hardware. The scan path that produced the advert is implicit in
+ * [CameraVendor.discoveryMode].
  */
 data class CameraAdvert(
     val vendor: CameraVendor,

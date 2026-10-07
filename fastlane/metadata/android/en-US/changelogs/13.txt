@@ -1,0 +1,1 @@
+Adds support for Y38 otoscopes, which broadcast an open Wi-Fi named `AIR-ES-XXXXXX`.
