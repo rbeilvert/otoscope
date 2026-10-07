@@ -25,6 +25,8 @@ class CameraVendorsRegistryTest {
         assertTrue(ItimoVendor in CameraVendors.all)
         assertTrue(JegoatVendor in CameraVendors.all)
         assertTrue(EarFairyVendor in CameraVendors.all)
+        assertTrue(I4seasonVendor in CameraVendors.all)
+        assertTrue(Y38Vendor in CameraVendors.all)
 
         assertTrue(XyllaVendor in CameraVendors.bleVendors)
         assertTrue(ItimoVendor in CameraVendors.bleVendors)
@@ -34,9 +36,13 @@ class CameraVendorsRegistryTest {
         assertTrue(EarFairyVendor in CameraVendors.wifiScanVendors)
         assertTrue(EarFairyVendor !in CameraVendors.bleVendors)
 
-        assertTrue(I4seasonVendor in CameraVendors.all)
         assertTrue(I4seasonVendor in CameraVendors.wifiScanVendors)
         assertTrue(I4seasonVendor !in CameraVendors.bleVendors)
+
+        // Y38 is a Wi-Fi-only sibling of Xylla (same wire protocol under the
+        // hood) sold under its own brand; the two live on opposite cards.
+        assertTrue(Y38Vendor in CameraVendors.wifiScanVendors)
+        assertTrue(Y38Vendor !in CameraVendors.bleVendors)
     }
 
     @Test fun `iTiMO advert wins over Xylla even with matching 66-99 magic`() {
