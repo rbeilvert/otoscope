@@ -23,8 +23,7 @@ Otoscope is a reverse-engineered drop-in replacement for the proprietary compani
 
 ## Hardware compatibility
 
-The app supports a set of camera families across two discovery paths.
-Pick your family on the home screen; the app scans the right way and hands the video off to the vendor-specific protocol automatically.
+The app supports seven camera families across two discovery paths. Pick your family on the home screen; the app scans the right way and hands the video off to the vendor-specific protocol automatically.
 
 | Family        | Discovery | SSID prefix                      | Wi-Fi auth | Video | Companion app |
 |---------------|-----------|----------------------------------| ---------- | ----- | ------------- |
@@ -34,6 +33,7 @@ Pick your family on the home screen; the app scans the right way and hands the v
 | **EarFairy**  | Wi-Fi     | `Cooleer_XXXXXX`                 | open | RTSP/7070 MJPEG | "Cooleer" (`com.cooingdv.cooleer`) |
 | **Soulear** (i4season) | Wi-Fi | `Soulear-XXXXX`           | open | UDP MJPEG, control on 10005/10006 | "Soulear" (`com.i4season.bkCamera_soulear`) |
 | **Y38**       | Wi-Fi     | `AIR-ES-XXXXXX`                  | open | UDP/8032 MJPEG (Xylla-compatible) | "AIR-Look" (`com.air.airlook`) |
+| **NE3**       | Wi-Fi     | `HNDEC_XXXXXX`                   | open | UDP/8800 MJPEG | "HND" (`com.xiaozhen.beauty.hnd`) |
 
 If you have a wireless otoscope that isn't picked up by Otoscope, please file an issue including preferably
 the original companion application ID, a screenshot of the BLE advertisement (e.g. from nRF Connect),
@@ -56,19 +56,19 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## Status
 
-| Feature                    | State                                   |
-| -------------------------- |-----------------------------------------|
-| BLE discovery              | ✅ for Xylla, iTiMO, JEAGOAT             |
-| Wi-Fi discovery            | ✅ for EarFairy, Soulear, Y38            |
-| Wi-Fi join                 | ✅ open or WPA2                          |
-| Live video                 | ✅ MJPEG decoded in-app (UDP or RTSP)    |
-| Auto-rotate + circular mask | ✅ driven by camera accelerometer / gyro |
-| Horizontal-mirror toggle   | ✅ for self-examination                  |
-| Screen stays awake         | ✅ during live stream                    |
-| Battery + model readout    | ✅ where the camera exposes it           |
-| Photo / video capture      | ✅ JPEG stills and H.264 MP4 clips        |
-| Capture gallery            | ✅ in-app review, share and delete       |
-| Brightness control    | 🚧 On-Off implemented for EarFairy, Soulear |
+| Feature                     | State                                      |
+| --------------------------- | ------------------------------------------ |
+| BLE discovery               | ✅ for Xylla, iTiMO, JEAGOAT                |
+| Wi-Fi discovery             | ✅ for EarFairy, Soulear, Y38, NE3          |
+| Wi-Fi join                  | ✅ open or WPA2                             |
+| Live video                  | ✅ MJPEG decoded in-app (UDP or RTSP)       |
+| Auto-rotate + circular mask | ✅ driven by camera accelerometer / gyro    |
+| Horizontal-mirror toggle    | ✅ for self-examination                     |
+| Screen stays awake          | ✅ during live stream                       |
+| Battery + model readout     | ✅ where the camera exposes it              |
+| Photo / video capture       | ✅ JPEG stills and H.264 MP4 clips          |
+| Capture gallery             | ✅ in-app review, share and delete          |
+| Brightness control          | 🚧 On-Off implemented for EarFairy, Soulear |
 
 ## License
 
