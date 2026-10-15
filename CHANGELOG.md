@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] — 2026-10-15
+
+### Added
+- Support for **NE3** otoscopes, sold with the "HND" companion app (`com.xiaozhen.beauty.hnd`) and built around Bouffalo Lab BL602 hardware. The app discovers `HNDEC_XXXXXX` open access points via Wi-Fi. Accelerometer-driven auto-rotation is decoded from the rotation suffix the camera embeds in each frame.
+
 ## [0.10.0] — 2026-10-07
 
 ### Added
