@@ -79,11 +79,13 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     private var scanJob: Job? = null
     private var stallWatchdogJob: Job? = null
+    private val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     /** Horizontal-mirror state for the active stream. Owned here so the UI
-     *  reads it read-only and routes toggles back through [setFlipEnabled]. */
-    private val flipEnabled = MutableStateFlow(true)
-
+     *  reads it read-only and routes toggles back through [setFlipEnabled].
+     *  Persisted across sessions and app launches. */
+    private val flipEnabled = MutableStateFlow(prefs.getBoolean(KEY_FLIP_ENABLED, true))
+    
     /** Accelerometer-driven auto-rotation. Off shows (and saves) the image as
      *  the camera sends it. Kept across sessions within the app's lifetime. */
     private val autoRotateEnabled = MutableStateFlow(true)
@@ -209,7 +211,6 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             network = wifi.currentNetwork,
             cameraIp = cameraIp,
         )
-        flipEnabled.value = true
         manualRotation.value = 0f
         session.start()
         val rotation = combine(session.rotation, autoRotateEnabled, manualRotation) { degrees, auto, manual ->
@@ -366,6 +367,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setFlipEnabled(enabled: Boolean) {
         flipEnabled.value = enabled
+        prefs.edit().putBoolean(KEY_FLIP_ENABLED, enabled).apply()
     }
 
     fun setAutoRotateEnabled(enabled: Boolean) {
@@ -416,5 +418,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         // patience with a stuck "Waiting for frames" screen.
         private const val FIRST_PACKET_TIMEOUT_MS = 10_000L
         private const val DISCONNECT_NOTICE_MS = 3_000L
+        private const val PREFS_NAME = "otoscope_settings"
+        private const val KEY_FLIP_ENABLED = "flip_enabled"
     }
 }
