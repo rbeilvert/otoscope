@@ -79,21 +79,21 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     private var scanJob: Job? = null
     private var stallWatchdogJob: Job? = null
-    private val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    /** Horizontal-mirror state for the active stream. Owned here so the UI
-     *  reads it read-only and routes toggles back through [setFlipEnabled].
-     *  Persisted across sessions and app launches. */
-    private val flipEnabled = MutableStateFlow(prefs.getBoolean(KEY_FLIP_ENABLED, true))
-    
+    /** View options remembered across sessions and app launches. The UI reads
+     *  them read-only and routes changes back through the setters below. */
+    private val settings = StreamSettings(app, viewModelScope)
+
+    /** Horizontal-mirror state for the active stream. */
+    private val flipEnabled = settings.flipEnabled
+
     /** Accelerometer-driven auto-rotation. Off shows (and saves) the image as
-     *  the camera sends it. Kept across sessions within the app's lifetime. */
-    private val autoRotateEnabled = MutableStateFlow(true)
+     *  the camera sends it. */
+    private val autoRotateEnabled = settings.autoRotateEnabled
 
     /** Extra rotation the user applied manually via the rotate button, in
-     *  degrees. Only meaningful while auto-rotate is off; reset at every new
-     *  session so a reconnect starts flat. */
-    private val manualRotation = MutableStateFlow(0f)
+     *  degrees. Only meaningful while auto-rotate is off. */
+    private val manualRotation = settings.manualRotation
 
     fun startScan(mode: DiscoveryMode) {
         // Both modes need Wi-Fi enabled; BLE additionally needs Bluetooth on.
@@ -211,7 +211,6 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             network = wifi.currentNetwork,
             cameraIp = cameraIp,
         )
-        manualRotation.value = 0f
         session.start()
         val rotation = combine(session.rotation, autoRotateEnabled, manualRotation) { degrees, auto, manual ->
             if (auto) degrees else manual
@@ -367,7 +366,6 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setFlipEnabled(enabled: Boolean) {
         flipEnabled.value = enabled
-        prefs.edit().putBoolean(KEY_FLIP_ENABLED, enabled).apply()
     }
 
     fun setAutoRotateEnabled(enabled: Boolean) {
@@ -418,7 +416,5 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         // patience with a stuck "Waiting for frames" screen.
         private const val FIRST_PACKET_TIMEOUT_MS = 10_000L
         private const val DISCONNECT_NOTICE_MS = 3_000L
-        private const val PREFS_NAME = "otoscope_settings"
-        private const val KEY_FLIP_ENABLED = "flip_enabled"
     }
 }
