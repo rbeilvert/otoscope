@@ -4,11 +4,20 @@ import android.content.Context
 import android.net.Network
 import dev.rubec.otoscope.ble.CameraAdvert
 import dev.rubec.otoscope.stream.CameraSession
+import dev.rubec.otoscope.stream.beken.BekenSession
 import dev.rubec.otoscope.stream.ne3.Ne3Session
 
 /**
  * NE3 otoscope family, sold under the "HND" companion app
- * (`com.xiaozhen.beauty.hnd`). Bouffalo Lab BL602-based hardware; the
+ * (`com.xiaozhen.beauty.hnd`). Two hardware generations share the `HNDEC_`
+ * SSID and the app, and are told apart by the camera's IP (see [createSession]):
+ *
+ *  - **Bouffalo BL602** at `192.168.169.1` (this file's wire summary below,
+ *    [Ne3Session]).
+ *  - **Beken BK7231U** at `192.168.1.1`, a different protocol on UDP 46526 /
+ *    44506 / 52219, see [BekenSession] and `docs/beken-protocol.md`.
+ *
+ * Bouffalo Lab BL602-based hardware; the
  * vendor app is a thin JNI shim over Bouffalo Lab's "VII" (Video-over-IP)
  * SDK. We reimplement the wire protocol directly — the video is
  * fragmented headerless MJPEG on UDP/8800 that we assemble in
@@ -53,6 +62,14 @@ object Ne3Vendor : CameraVendor {
         )
     }
 
+    /** Only the Bouffalo camera lives at [defaultCameraIp]; the Beken camera's
+     *  DHCP gateway is `192.168.1.1`. UDP/8800 is closed on the Beken camera
+     *  (it answers ICMP port-unreachable), so guessing wrong never streams. */
     override fun createSession(context: Context, network: Network?, cameraIp: String): CameraSession =
-        Ne3Session(cameraIp = cameraIp, network = network)
+        if (isBouffalo(cameraIp)) Ne3Session(cameraIp = cameraIp, network = network)
+        else BekenSession(cameraIp = cameraIp, network = network)
+
+    internal fun isBouffalo(cameraIp: String): Boolean = cameraIp.startsWith(BOUFFALO_SUBNET)
+
+    private const val BOUFFALO_SUBNET = "192.168.169."
 }

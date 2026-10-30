@@ -33,7 +33,7 @@ The app supports seven camera families across two discovery paths. Pick your fam
 | **EarFairy**  | Wi-Fi     | `Cooleer_XXXXXX`                 | open | RTSP/7070 MJPEG | "Cooleer" (`com.cooingdv.cooleer`) |
 | **Soulear** (i4season) | Wi-Fi | `Soulear-XXXXX`           | open | UDP MJPEG, control on 10005/10006 | "Soulear" (`com.i4season.bkCamera_soulear`) |
 | **Y38**       | Wi-Fi     | `AIR-ES-XXXXXX`                  | open | UDP/8032 MJPEG (Xylla-compatible) | "AIR-Look" (`com.air.airlook`) |
-| **NE3**       | Wi-Fi     | `HNDEC_XXXXXX`                   | open | UDP/8800 MJPEG | "HND" (`com.xiaozhen.beauty.hnd`) |
+| **NE3**       | Wi-Fi     | `HNDEC_XXXXXX`                   | open | UDP/8800 MJPEG (Bouffalo, `192.168.169.1`)<br>UDP 44506 MJPEG (Beken, `192.168.1.1`) | "HND" (`com.xiaozhen.beauty.hnd`) |
 
 If you have a wireless otoscope that isn't picked up by Otoscope, please file an issue including preferably
 the original companion application ID, a screenshot of the BLE advertisement (e.g. from nRF Connect),

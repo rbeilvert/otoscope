@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Support for the **Beken-based HND NE3** (SoC BK7231U, device info `brand: HND-NE3`). It shares the `HNDEC_XXXXXX` Wi-Fi name and the HND app with the Bouffalo NE3, but sits at `192.168.1.1`, has UDP/8800 closed and speaks a different protocol: device info on UDP 46526, MJPEG video on 44506, accelerometer on 52219. The app picks the session from the camera's DHCP gateway (`192.168.169.x` is the Bouffalo camera). Auto-rotation uses the roll angle the camera sends itself, unchanged. No ring light and no battery readout. Protocol notes: `docs/beken-protocol.md`.
+
 ## [0.11.0] — 2026-10-15
 
 ### Added
