@@ -79,6 +79,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     private var scanJob: Job? = null
     private var stallWatchdogJob: Job? = null
+    private var connectJob: Job? = null
 
     /** Horizontal-mirror state for the active stream. Owned here so the UI
      *  reads it read-only and routes toggles back through [setFlipEnabled]. */
@@ -143,9 +144,13 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun connect(advert: CameraAdvert) {
+        // Repeated taps must not start parallel connects: they would overwrite
+        // each other's network callback, tear down the shared Wi-Fi request and
+        // leave an orphaned session sending into a dead network.
+        if (connectJob?.isActive == true || _state.value is CameraState.Streaming) return
         stopScan()
         _state.value = CameraState.Connecting(advert, attempt = 1, totalAttempts = CONNECT_ATTEMPTS)
-        viewModelScope.launch {
+        connectJob = viewModelScope.launch {
             // Fast path when the user is already joined to the camera network
             // via Android settings. No specifier prompt, no join-retry loop;
             // we just adopt the active Network handle. Any vendor qualifies.
@@ -388,6 +393,8 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun disconnect() {
+        connectJob?.cancel()
+        connectJob = null
         stallWatchdogJob?.cancel()
         stallWatchdogJob = null
         capture.detach()
