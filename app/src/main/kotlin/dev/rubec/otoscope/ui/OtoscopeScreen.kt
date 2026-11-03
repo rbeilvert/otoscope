@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.Rotate90DegreesCcw
 import androidx.compose.material.icons.filled.ScreenRotation
@@ -100,6 +102,7 @@ fun OtoscopeScreen(
     capture: CaptureController,
     onEnableBluetooth: () -> Unit,
     onEnableWifi: () -> Unit,
+    onEnableLocation: () -> Unit,
     onStartScan: (DiscoveryMode) -> Unit,
     onStopScan: () -> Unit,
     onConnect: (CameraAdvert) -> Unit,
@@ -143,6 +146,7 @@ fun OtoscopeScreen(
                         state = state,
                         onEnableBluetooth = onEnableBluetooth,
                         onEnableWifi = onEnableWifi,
+                        onEnableLocation = onEnableLocation,
                         onStopScan = onStopScan,
                         onDisconnect = onDisconnect,
                     )
@@ -179,7 +183,7 @@ fun OtoscopeScreen(
                     padding = PaddingValues(16.dp),
                 )
                 // Everything else (Idle, Error, Disconnected, BluetoothOff,
-                // WifiOff) lands on the home screen. The picker stays visible
+                // WifiOff, LocationOff) lands on the home screen. The picker stays visible
                 // so the user can pick the other discovery path even if the
                 // required radio for one of them is off.
                 else -> HomeView(
@@ -220,12 +224,13 @@ private fun DeviceActions(
     state: CameraState,
     onEnableBluetooth: () -> Unit,
     onEnableWifi: () -> Unit,
+    onEnableLocation: () -> Unit,
     onStopScan: () -> Unit,
     onDisconnect: () -> Unit,
 ) {
     // The top-bar action set is purely context-sensitive: disconnect while
-    // streaming, stop while scanning, or "Turn on Bluetooth / Wi-Fi" if the
-    // corresponding radio is off. The "start scan" affordance moved into the
+    // streaming, stop while scanning, or "Turn on Bluetooth / Wi-Fi /
+    // Location" if the corresponding switch is off. The "start scan" affordance moved into the
     // home-screen model picker.
     when {
         state is CameraState.Streaming -> {
@@ -252,6 +257,13 @@ private fun DeviceActions(
                 Icon(Icons.Default.Wifi, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
                 Text("Turn on Wi-Fi")
+            }
+        }
+        state is CameraState.LocationOff -> {
+            Button(onClick = onEnableLocation) {
+                Icon(Icons.Default.LocationOn, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Turn on Location")
             }
         }
     }
@@ -285,9 +297,19 @@ private fun HomeView(
                 IconMessage(Icons.Default.BluetoothDisabled, "Bluetooth is off. Turn it on to pair a BLE camera.")
             is CameraState.WifiOff ->
                 IconMessage(Icons.Default.WifiOff, "Wi-Fi is off. Turn it on to connect to a camera.")
+            is CameraState.LocationOff ->
+                IconMessage(
+                    Icons.Default.LocationOff,
+                    "Location is off. On this Android version, apps can only find nearby " +
+                        "cameras while it is on. Otoscope does not use your location.",
+                )
             else -> Unit
         }
-        if (state is CameraState.BluetoothOff || state is CameraState.WifiOff) Spacer(Modifier.height(16.dp))
+        if (
+            state is CameraState.BluetoothOff ||
+            state is CameraState.WifiOff ||
+            state is CameraState.LocationOff
+        ) Spacer(Modifier.height(16.dp))
 
         Text(
             "Pick the model of your otoscope",

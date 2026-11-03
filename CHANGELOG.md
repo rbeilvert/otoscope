@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] — 2026-11-03
+
+### Fixed
+- On Android 12L and older, the Wi-Fi scan silently found nothing while the phone's Location switch was off, even with the permission granted. On Android 11 and older the Bluetooth scan had the same problem. The app now says that Location is off and shows a "Turn on Location" button instead of scanning forever.
+
 ## [0.11.0] — 2026-10-22
 
 ### Changed
