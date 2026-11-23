@@ -3,7 +3,9 @@ package dev.rubec.otoscope.vm
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
+import android.location.LocationManager
 import android.net.wifi.WifiManager
+import android.os.Build
 import dev.rubec.otoscope.debug.FileLog as Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -35,6 +37,11 @@ sealed interface CameraState {
     data object Idle : CameraState
     data object BluetoothOff : CameraState
     data object WifiOff : CameraState
+
+    /** The system Location switch is off on an Android version that hides
+     *  scan results from apps while it is (see
+     *  [CameraViewModel.locationRequiredFor]). */
+    data object LocationOff : CameraState
     data class Scanning(val mode: DiscoveryMode) : CameraState
     data class Found(val advert: CameraAdvert) : CameraState
     data class Connecting(
@@ -66,6 +73,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     private val wifiScanner = CameraWifiScanner(app)
     private val wifi = CameraWifiConnector(app)
     private val wifiManager = app.getSystemService(Context.WIFI_SERVICE) as WifiManager
+    private val locationManager = app.getSystemService(LocationManager::class.java)
 
     private val _state = MutableStateFlow<CameraState>(CameraState.Idle)
     val state: StateFlow<CameraState> = _state.asStateFlow()
@@ -81,18 +89,20 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     private var stallWatchdogJob: Job? = null
     private var connectJob: Job? = null
 
-    /** Horizontal-mirror state for the active stream. Owned here so the UI
-     *  reads it read-only and routes toggles back through [setFlipEnabled]. */
-    private val flipEnabled = MutableStateFlow(true)
+    /** View options remembered across sessions and app launches. The UI reads
+     *  them read-only and routes changes back through the setters below. */
+    private val settings = StreamSettings(app, viewModelScope)
+
+    /** Horizontal-mirror state for the active stream. */
+    private val flipEnabled = settings.flipEnabled
 
     /** Accelerometer-driven auto-rotation. Off shows (and saves) the image as
-     *  the camera sends it. Kept across sessions within the app's lifetime. */
-    private val autoRotateEnabled = MutableStateFlow(true)
+     *  the camera sends it. */
+    private val autoRotateEnabled = settings.autoRotateEnabled
 
     /** Extra rotation the user applied manually via the rotate button, in
-     *  degrees. Only meaningful while auto-rotate is off; reset at every new
-     *  session so a reconnect starts flat. */
-    private val manualRotation = MutableStateFlow(0f)
+     *  degrees. Only meaningful while auto-rotate is off. */
+    private val manualRotation = settings.manualRotation
 
     fun startScan(mode: DiscoveryMode) {
         // Both modes need Wi-Fi enabled; BLE additionally needs Bluetooth on.
@@ -102,6 +112,13 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (!wifiManager.isWifiEnabled) {
             _state.value = CameraState.WifiOff
+            return
+        }
+        // Checked up front because Android gives no error when Location is
+        // off: scans just come back empty and the user waits forever.
+        if (locationRequiredFor(mode) && locationManager?.isLocationEnabled == false) {
+            Log.i(TAG, "startScan($mode): Location is off on API ${Build.VERSION.SDK_INT}")
+            _state.value = CameraState.LocationOff
             return
         }
         scanJob?.cancel()
@@ -214,8 +231,6 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             network = wifi.currentNetwork,
             cameraIp = cameraIp,
         )
-        flipEnabled.value = true
-        manualRotation.value = 0f
         session.start()
         val rotation = combine(session.rotation, autoRotateEnabled, manualRotation) { degrees, auto, manual ->
             if (auto) degrees else manual
@@ -409,6 +424,20 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
+        /** Whether this Android version only hands scan results to apps while
+         *  the system Location switch is on. The permission alone is not enough
+         *  there: with the switch off, the platform silently returns nothing.
+         *  - BLE: up to Android 11. From 12 (API 31), BLUETOOTH_SCAN declared
+         *    `neverForLocation` lifts it.
+         *  - Wi-Fi scan: up to Android 12L. From 13 (API 33),
+         *    NEARBY_WIFI_DEVICES declared `neverForLocation` lifts it. Below
+         *    that the switch also hides the SSID of the current connection,
+         *    so the "join from Wi-Fi settings" fallback fails too. */
+        private fun locationRequiredFor(mode: DiscoveryMode): Boolean = when (mode) {
+            DiscoveryMode.BLE -> Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+            DiscoveryMode.WIFI_SCAN -> Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+        }
+
         private const val TAG = "CameraViewModel"
         private const val CONNECT_ATTEMPTS = 3
         private const val RETRY_BACKOFF_MS = 1_500L

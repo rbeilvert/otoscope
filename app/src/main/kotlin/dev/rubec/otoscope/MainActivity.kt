@@ -67,6 +67,9 @@ class MainActivity : ComponentActivity() {
             val enableWifiLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.StartActivityForResult()
             ) { vm.stopScan() }
+            val enableLocationLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult()
+            ) { vm.stopScan() }
 
             val onStartScan: (DiscoveryMode) -> Unit = { mode ->
                 val needed = permissionsFor(mode)
@@ -98,6 +101,9 @@ class MainActivity : ComponentActivity() {
                         },
                         onEnableWifi = {
                             enableWifiLauncher.launch(Intent(Settings.Panel.ACTION_WIFI))
+                        },
+                        onEnableLocation = {
+                            enableLocationLauncher.launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                         },
                         onStartScan = onStartScan,
                         onStopScan = vm::stopScan,

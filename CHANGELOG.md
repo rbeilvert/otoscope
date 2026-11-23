@@ -11,7 +11,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 - Support for the **Beken-based HND NE3** (SoC BK7231U, device info `brand: HND-NE3`). It shares the `HNDEC_XXXXXX` Wi-Fi name and the HND app with the Bouffalo NE3, but sits at `192.168.1.1`, has UDP/8800 closed and speaks a different protocol: device info on UDP 46526, MJPEG video on 44506, accelerometer on 52219. The app picks the session from the camera's DHCP gateway (`192.168.169.x` is the Bouffalo camera). Auto-rotation uses the roll angle the camera sends itself, unchanged. No ring light and no battery readout. Protocol notes: `docs/beken-protocol.md`.
 
-## [0.11.0] — 2026-10-15
+### Changed
+- Merged upstream 0.11.0 and 0.11.1: remembered mirror/auto-rotate/manual-rotation settings and the "Location is off" hint.
+
+## [0.11.1] — 2026-11-03
+
+### Fixed
+- On Android 12L and older, the Wi-Fi scan silently found nothing while the phone's Location switch was off, even with the permission granted. On Android 11 and older the Bluetooth scan had the same problem. The app now says that Location is off and shows a "Turn on Location" button instead of scanning forever.
+
+## [0.11.0] — 2026-10-22
+
+### Changed
+- The mirror, auto-rotate and manual rotation settings are now remembered across sessions and app launches, instead of resetting on every reconnect. Turning auto-rotate back on still resets the manual rotation.
+
+## [0.11.0-ne3] — 2026-10-15
 
 ### Added
 - Support for **NE3** otoscopes, sold with the "HND" companion app (`com.xiaozhen.beauty.hnd`) and built around Bouffalo Lab BL602 hardware. The app discovers `HNDEC_XXXXXX` open access points via Wi-Fi. Accelerometer-driven auto-rotation is decoded from the rotation suffix the camera embeds in each frame.

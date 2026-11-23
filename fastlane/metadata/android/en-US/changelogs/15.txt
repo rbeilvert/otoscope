@@ -1,0 +1,1 @@
+Inform that Location is off and show a "Turn on Location" button instead of scanning forever on relevant Android versions.

@@ -1,0 +1,1 @@
+Adds support for NE3 otoscopes (Bouffalo and Beken variants, HND companion app) and Y38 otoscopes. Includes the Location-off hint and remembered mirror/rotation settings.
