@@ -22,5 +22,6 @@ Supported hardware families:
 • EarFairy — SSID `Cooleer_XXXXXX`.
 • Soulear (i4season) — SSID `Soulear-XXXXX`.
 • Y38 — SSID `AIR-ES-XXXXXX`.
+• NE3 — SSID `HNDEC_XXXXXX`.
 
 Otoscope is GPL-3.0-or-later and contains no third-party trackers, ad SDKs, or proprietary native libraries.
